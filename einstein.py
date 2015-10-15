@@ -1,8 +1,12 @@
 #!/usr/bin/python
 import itertools
+import termcolor
 
 '''
 Now with classes!
+
+TODO:
+	* Add the clue-strings to output
 
 There are five houses in five different colors in a row. In each house lives a person with a different nationality. The five owners drink a certain type of beverage, smoke a certain brand of cigar and keep a certain pet. No owners have the same pet, smoke the same brand of cigar, or drink the same beverage. Other facts:
 
@@ -43,7 +47,8 @@ class Puzzle:
 
 
 	class House():
-		def __init__(self, pos):
+		def __init__(self, pos, puzzle_inst):
+			self.puzzle_inst = puzzle_inst
 			self.props = {}
 			self.props['pos'] = pos
 
@@ -57,8 +62,10 @@ class Puzzle:
 			val = self.props.get(key)
 			return val is not None and not isinstance(val, list)
 
-		def set_value(self, key, val):
+		def set_prop_value(self, key, val):
+			self.puzzle_inst.changed_last_cycle = True
 			self.props[key] = val
+			print self.puzzle_inst.status_str(val)
 
 		def add_possible(self, key, val):
 			if not self.props.has_key(key):
@@ -72,7 +79,7 @@ class Puzzle:
 				self.props[key].remove(val)
 
 			if len(self.props[key]) is 1:
-				self.set_value(key, val)
+				self.set_prop_value(key, val)
 
 	def set_facts(self):
 		a, b, c, d = self.perm
@@ -168,7 +175,7 @@ class Puzzle:
 			raise self.PuzzleFinish(False, "Can't add {} of {} to house {}, value already at house {}".format(key2, val2, house.props['pos'], h.props['pos']))
 
 		self.changed_last_cycle = True
-		house.set_value(key2, val2)
+		house.set_prop_value(key2, val2)
 
 		for h in self.houses:
 			if h is not house:
@@ -185,15 +192,18 @@ class Puzzle:
 				self.current_fact,
 				len(self.facts))
 
-	def houses_str(self):
-		ret = ''
+	def status_str(self, colour_val=None):
+		ret = str(self) + '\n'
 		for prop in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
 			ret += prop + '\t'
 			for house in self.houses:
+				val = house.props[prop]
 				if house.prop_found(prop):
-					ret += "{}\t".format(house.props[prop])
+					if val is colour_val:
+						val = termcolor.colored(val, 'green')
+					ret += "{}\t".format(val)
 				else:
-					ret += "{}\t".format('|' * len(house.props[prop]))
+					ret += "{}\t".format('|' * len(val))
 			ret += '\n'
 		return ret
 
@@ -204,7 +214,7 @@ class Puzzle:
 		self.set_facts()
 		self.houses = []
 		for i in range(self.no_of_houses):
-			self.houses += [ self.House(i) ]
+			self.houses += [ self.House(i, self) ]
 
 		self.populate_houses()
 
@@ -215,14 +225,10 @@ class Puzzle:
 				for n, f in enumerate(self.facts):
 					self.current_fact = n + 1
 					self.try_fact(*f)
-					print self
-					print self.houses_str()
 				if not self.changed_last_cycle:
-					raise self.PuzzleFinish(False, "No new information added on the last cycle.")
+					raise self.PuzzleFinish(False, "No new information added during cycle #{}.".format(self.no_of_cycles))
 		except self.PuzzleFinish as f:
-			print self
-			print f
-			print
+			print "{}\n{}\n{}\n".format(self, f, '=' * 50)
 
 def main():
 	for perm in itertools.product(*tuple([[-1, 1]] * 4)):
