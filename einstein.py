@@ -65,7 +65,7 @@ class Puzzle:
 		def set_prop_value(self, key, val):
 			self.puzzle_inst.changed_last_cycle = True
 			self.props[key] = val
-			print self.puzzle_inst.status_str(val)
+			print(self.puzzle_inst.houses_str(val))
 
 		def add_possible(self, key, val):
 			if not self.props.has_key(key):
@@ -148,7 +148,7 @@ class Puzzle:
 		if rel:
 			rel_pos = f[0].props['pos'] + rel
 			if rel_pos < 0 or rel_pos >= self.no_of_houses:
-				raise self.PuzzleFinish(False, "Tried to access invalid house position (pos {})".format(rel_pos))
+				raise self.PuzzleFinish(False, "Tried to access invalid house position (pos {}).".format(rel_pos))
 				return None
 			return self.find_house('pos', rel_pos)
 		else:
@@ -163,9 +163,10 @@ class Puzzle:
 
 		if house.prop_found(key2):
 			# Already has value; only error out if value is different
-			if house.props[key2] is not val2:
+			if house.props[key2] is val2:
+				return
+			else:
 				raise self.PuzzleFinish(False, "Can't add {} of {} to house {}, already has value of {}".format(key2, val2, house.props['pos'], house.props[key2]))
-			return
 		else:
 			if not val2 in house.props[key2]:
 				raise self.PuzzleFinish(False, "Can't add {} of {} to house {}; value removed from possible list.".format(key2, val2, house.props['pos']))
@@ -182,8 +183,8 @@ class Puzzle:
 				h.remove_possible(key2, val2)
 
 	def try_fact(self, key1, val1, key2, val2, rel=0):
-		(self.try_add_one_way(key1, val1, key2, val2, rel) and
-		self.try_add_one_way(key2, val2, key1, val1, -rel))
+		self.try_add_one_way(key1, val1, key2, val2, rel)
+		self.try_add_one_way(key2, val2, key1, val1, -rel)
 
 	def __str__(self):
 		return 'Puzzle {}\tCycle\t{}\tFact\t{}/{}'.format(
@@ -192,18 +193,18 @@ class Puzzle:
 				self.current_fact,
 				len(self.facts))
 
-	def status_str(self, colour_val=None):
-		ret = str(self) + '\n'
+	def houses_str(self, colour_val=None):
+		ret = '{}\n'.format(self)
 		for prop in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
-			ret += prop + '\t'
+			ret += '{}\t'.format(prop)
 			for house in self.houses:
 				val = house.props[prop]
 				if house.prop_found(prop):
 					if val is colour_val:
 						val = termcolor.colored(val, 'green')
-					ret += "{}\t".format(val)
+					ret += '{}\t'.format(val)
 				else:
-					ret += "{}\t".format('|' * len(val))
+					ret += '{}\t'.format('|' * len(val))
 			ret += '\n'
 		return ret
 
@@ -228,7 +229,7 @@ class Puzzle:
 				if not self.changed_last_cycle:
 					raise self.PuzzleFinish(False, "No new information added during cycle #{}.".format(self.no_of_cycles))
 		except self.PuzzleFinish as f:
-			print "{}\n{}\n{}\n".format(self, f, '=' * 50)
+			print("{}\n{}\n{}\n".format(self, f, '=' * 50))
 
 def main():
 	for perm in itertools.product(*tuple([[-1, 1]] * 4)):
