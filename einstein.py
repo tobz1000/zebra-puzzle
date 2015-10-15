@@ -31,12 +31,15 @@ class Puzzle:
 	# Max times to try each fact
 	max_cycles = 20
 
-	class PuzzleFail(Exception):
-		def __init__(self, message):
+	class PuzzleFinish(Exception):
+		def __init__(self, solved, message=None):
+			self.solved = solved
 			self.message = message
 
 		def __str__(self):
-			return message
+			return "{}: {}".format(
+					"SOLVED" if self.solved else "FAILED",
+					self.message or '')
 
 
 	class House():
@@ -71,8 +74,8 @@ class Puzzle:
 			if len(self.props[key]) is 1:
 				self.set_value(key, val)
 
-	def set_facts(self, perm=None):
-		perm = perm or self.perm
+	def set_facts(self):
+		a, b, c, d = self.perm
 		self.facts = [
 			# 1. The Brit lives in the red house.
 			('nat', 'bri', 'col', 'red'),
@@ -102,10 +105,10 @@ class Puzzle:
 			('nat', 'nor', 'pos', 0),
 
 			# 10. The owner who smokes Blends lives next to the one who keeps cats.
-			('smo', 'ble', 'pet', 'cat', perm[0]),
+			('smo', 'ble', 'pet', 'cat', a),
 
 			# 11. The owner who keeps the horse lives next to the one who smokes Dunhill.
-			('pet', 'hor', 'smo', 'dun', perm[1]),
+			('pet', 'hor', 'smo', 'dun', b),
 
 			# 12. The owner who smokes Bluemasters drinks beer.
 			('smo', 'blu', 'dri', 'bee'),
@@ -114,18 +117,16 @@ class Puzzle:
 			('nat', 'ger', 'smo', 'pri'),
 
 			# 14. The Norwegian lives next to the blue house.
-			('nat', 'nor', 'col', 'blu', perm[2]),
+			('nat', 'nor', 'col', 'blu', c),
 
 			# 15. The owner who smokes Blends lives next to the one who drinks water.
-			('smo', 'ble', 'dri', 'wat', perm[3])
+			('smo', 'ble', 'dri', 'wat', d)
 		]
 
-	def populate_houses(self, facts=None):
-		facts = facts or self.facts
-
+	def populate_houses(self):
 		for h in self.houses:
 			h.add_possible('pet', 'fis')
-			for f in facts:
+			for f in self.facts:
 				h.add_possible(f[0], f[1])
 				h.add_possible(f[2], f[3])
 
@@ -140,7 +141,7 @@ class Puzzle:
 		if rel:
 			rel_pos = f[0].props['pos'] + rel
 			if rel_pos < 0 or rel_pos >= self.no_of_houses:
-				raise self.PuzzleFail("Tried to access invalid house position (pos {})".format(rel_pos))
+				raise self.PuzzleFinish(False, "Tried to access invalid house position (pos {})".format(rel_pos))
 				return None
 			return self.find_house('pos', rel_pos)
 		else:
@@ -148,9 +149,6 @@ class Puzzle:
 
 	# Returns whether or not to try and add the other way
 	def try_add_one_way(self, key1, val1, key2, val2, rel):
-		if self.finished:
-			return
-
 		house = self.find_house(key1, val1, rel)
 
 		if house is None:
@@ -159,15 +157,15 @@ class Puzzle:
 		if house.prop_found(key2):
 			# Already has value; only error out if value is different
 			if house.props[key2] is not val2:
-				raise self.PuzzleFail("Can't add {} of {} to house {}, already has value of {}".format(key2, val2, house.props['pos'], house.props[key2]))
+				raise self.PuzzleFinish(False, "Can't add {} of {} to house {}, already has value of {}".format(key2, val2, house.props['pos'], house.props[key2]))
 			return
 		else:
 			if not val2 in house.props[key2]:
-				raise self.PuzzleFail("Can't add {} of {} to house {}; value removed from possible list.".format(key2, val2, house.props['pos']))
+				raise self.PuzzleFinish(False, "Can't add {} of {} to house {}; value removed from possible list.".format(key2, val2, house.props['pos']))
 
 		h = self.find_house(key2, val2)
 		if h:
-			raise self.PuzzleFail("Can't add {} of {} to house {}, value already at house {}".format(key2, val2, house.props['pos'], h.props['pos']))
+			raise self.PuzzleFinish(False, "Can't add {} of {} to house {}, value already at house {}".format(key2, val2, house.props['pos'], h.props['pos']))
 
 		self.changed_last_cycle = True
 		house.set_value(key2, val2)
@@ -180,30 +178,12 @@ class Puzzle:
 		(self.try_add_one_way(key1, val1, key2, val2, rel) and
 		self.try_add_one_way(key2, val2, key1, val1, -rel))
 
-	def finish(self, solved, message=None):
-		if self.finished:
-			return
-		self.finished = True
-		self.solved = solved
-		self.message = message
-
-	def __str__(self, show_houses=True):
-		ret = 'Puzzle {}\tCycle\t{}\tFact\t{}/{}'.format(
+	def __str__(self):
+		return 'Puzzle {}\tCycle\t{}\tFact\t{}/{}'.format(
 				self.perm,
 				self.no_of_cycles,
 				self.current_fact,
 				len(self.facts))
-
-		if show_houses:
-			for prop in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
-				ret += prop + '\t'
-				for house in self.houses:
-					if house.prop_found(prop):
-						ret += "{}\t".format(house.props[prop])
-					else:
-						ret += "{}\t".format('|' * len(house.props[prop]))
-				ret += '\n'
-			return ret
 
 	def houses_str(self):
 		ret = ''
@@ -221,9 +201,6 @@ class Puzzle:
 		self.perm = perm
 		self.no_of_cycles = 0
 		self.current_fact = 0
-		self.finished = False
-		self.solved = False
-		self.message = None
 		self.set_facts()
 		self.houses = []
 		for i in range(self.no_of_houses):
@@ -232,21 +209,20 @@ class Puzzle:
 		self.populate_houses()
 
 		try:
-			while not self.finished:
+			while True:
 				self.no_of_cycles += 1
 				self.changed_last_cycle = False
 				for n, f in enumerate(self.facts):
 					self.current_fact = n + 1
-					if self.finished:
-						break
 					self.try_fact(*f)
-					# print self
+					print self
+					print self.houses_str()
 				if not self.changed_last_cycle:
-					raise self.PuzzleFail("No new information added on the last cycle.")
-		except self.PuzzleFail as f:
-			self.finish(False, f.message)
+					raise self.PuzzleFinish(False, "No new information added on the last cycle.")
+		except self.PuzzleFinish as f:
 			print self
-			print f.message
+			print f
+			print
 
 def main():
 	for perm in itertools.product(*tuple([[-1, 1]] * 4)):
