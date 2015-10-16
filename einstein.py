@@ -1,14 +1,19 @@
 #!/usr/bin/python
 import itertools
 import termcolor
+import argparse
 
 '''
 Now with classes!
 
 TODO:
-	* Add the clue-strings to output
+	* Make clue-strings available in output
 
-There are five houses in five different colors in a row. In each house lives a person with a different nationality. The five owners drink a certain type of beverage, smoke a certain brand of cigar and keep a certain pet. No owners have the same pet, smoke the same brand of cigar, or drink the same beverage. Other facts:
+There are five houses in five different colors in a row. In each house lives a
+person with a different nationality. The five owners drink a certain type of
+beverage, smoke a certain brand of cigar and keep a certain pet. No owners have
+the same pet, smoke the same brand of cigar, or drink the same beverage. Other
+facts:
 
 1. The Brit lives in the red house.
 2. The Swede keeps dogs as pets.
@@ -65,7 +70,8 @@ class Puzzle:
 		def set_prop_value(self, key, val):
 			self.puzzle_inst.changed_last_cycle = True
 			self.props[key] = val
-			print(self.puzzle_inst.houses_str(val))
+			if verbose:
+				print(self.puzzle_inst.houses_str(val))
 
 		def add_possible(self, key, val):
 			if not self.props.has_key(key):
@@ -111,10 +117,12 @@ class Puzzle:
 			# 9. The Norwegian lives in the first house.
 			('nat', 'nor', 'pos', 0),
 
-			# 10. The owner who smokes Blends lives next to the one who keeps cats.
+			# 10. The owner who smokes Blends lives next to the one who keeps
+			# cats.
 			('smo', 'ble', 'pet', 'cat', a),
 
-			# 11. The owner who keeps the horse lives next to the one who smokes Dunhill.
+			# 11. The owner who keeps the horse lives next to the one who smokes
+			# Dunhill.
 			('pet', 'hor', 'smo', 'dun', b),
 
 			# 12. The owner who smokes Bluemasters drinks beer.
@@ -126,7 +134,8 @@ class Puzzle:
 			# 14. The Norwegian lives next to the blue house.
 			('nat', 'nor', 'col', 'blu', c),
 
-			# 15. The owner who smokes Blends lives next to the one who drinks water.
+			# 15. The owner who smokes Blends lives next to the one who drinks
+			# water.
 			('smo', 'ble', 'dri', 'wat', d)
 		]
 
@@ -148,7 +157,8 @@ class Puzzle:
 		if rel:
 			rel_pos = f[0].props['pos'] + rel
 			if rel_pos < 0 or rel_pos >= self.no_of_houses:
-				raise self.PuzzleFinish(False, "Tried to access invalid house position (pos {}).".format(rel_pos))
+				raise self.PuzzleFinish(False, "Tried to access invalid house "
+						"position (pos {}).".format(rel_pos))
 				return None
 			return self.find_house('pos', rel_pos)
 		else:
@@ -166,14 +176,20 @@ class Puzzle:
 			if house.props[key2] is val2:
 				return
 			else:
-				raise self.PuzzleFinish(False, "Can't add {} of {} to house {}, already has value of {}".format(key2, val2, house.props['pos'], house.props[key2]))
+				raise self.PuzzleFinish(False, "Can't add {} of {} to house "
+						"{}, already has value of {}".format(key2, val2,
+									house.props['pos'], house.props[key2]))
 		else:
 			if not val2 in house.props[key2]:
-				raise self.PuzzleFinish(False, "Can't add {} of {} to house {}; value removed from possible list.".format(key2, val2, house.props['pos']))
+				raise self.PuzzleFinish(False, "Can't add {} of {} to house {}"
+						"; value removed from possible list.".format(key2, val2,
+								house.props['pos']))
 
 		h = self.find_house(key2, val2)
 		if h:
-			raise self.PuzzleFinish(False, "Can't add {} of {} to house {}, value already at house {}".format(key2, val2, house.props['pos'], h.props['pos']))
+			raise self.PuzzleFinish(False, "Can't add {} of {} to house "
+					"{}, value already at house {}".format(key2, val2,
+								house.props['pos'], h.props['pos']))
 
 		self.changed_last_cycle = True
 		house.set_prop_value(key2, val2)
@@ -227,11 +243,22 @@ class Puzzle:
 					self.current_fact = n + 1
 					self.try_fact(*f)
 				if not self.changed_last_cycle:
-					raise self.PuzzleFinish(False, "No new information added during cycle #{}.".format(self.no_of_cycles))
+					raise self.PuzzleFinish(False, "No new information added "
+							"during cycle #{}.".format(self.no_of_cycles))
 		except self.PuzzleFinish as f:
-			print("{}\n{}\n{}\n".format(self, f, '=' * 50))
+			print("{}\n{}".format(self, f))
+			if verbose:
+				print("{}".format('=' * 50))
+			print
 
 def main():
+	ap = argparse.ArgumentParser(
+			description='Einstein\'s puzzle-solver.')
+	ap.add_argument('-v', dest='verbose', action='store_true',
+			help='Print verbose output.')
+	args = ap.parse_args()
+	global verbose
+	verbose = args.verbose
 	for perm in itertools.product(*tuple([[-1, 1]] * 4)):
 		Puzzle(perm)
 
