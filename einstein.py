@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import itertools
 import termcolor
 import argparse
@@ -7,6 +7,12 @@ import argparse
 Now with classes!
 
 TODO:
+	* Create new facts for future cycles:
+		* E.g. facts 15 & 10 together imply either
+				(depending on values of a + d):
+			* Cat-owner drinks water
+			* Cat-owner lives 2 to the left/right of water-drinker
+	* Scan in facts from facts.txt to save on all the format-faffing
 	* Make clue-strings available in output
 
 There are five houses in five different colors in a row. In each house lives a
@@ -35,7 +41,6 @@ The question is: who owns the fish?
 '''
 
 class Puzzle:
-
 	no_of_houses = 5
 	# Max times to try each fact
 	max_cycles = 20
@@ -71,10 +76,10 @@ class Puzzle:
 			self.puzzle_inst.changed_last_cycle = True
 			self.props[key] = val
 			if verbose:
-				print(self.puzzle_inst.houses_str(val))
+				print(self.puzzle_inst.houses_str(key, val))
 
 		def add_possible(self, key, val):
-			if not self.props.has_key(key):
+			if not key in self.props:
 				self.props[key] = []
 
 			if not self.prop_found(key) and not val in self.props[key]:
@@ -87,64 +92,62 @@ class Puzzle:
 			if len(self.props[key]) is 1:
 				self.set_prop_value(key, val)
 
-	def set_facts(self):
-		a, b, c, d = self.perm
-		self.facts = [
-			# 1. The Brit lives in the red house.
-			('nat', 'bri', 'col', 'red'),
+	# A dictionary of properties (tuples) with a relative position from one
+	# another.
+	class Fact():
+		def __init__(self, props):
+			self.props = props
 
-			# 2. The Swede keeps dogs as pets.
-			('nat', 'swe', 'pet', 'dog'),
+		def __str__(self):
+			return str(self.props)
 
-			# 3. The Dane drinks tea.
-			('nat', 'dan', 'dri', 'tea'),
+		def adjust_rel_values(self, adj):
+			for p, r in self.props.items():
+				self.props[p] += adj
 
-			# 4. The green house is on the immediate left of the white house.
-			('col', 'gre', 'col', 'whi', -1),
+		def __add__(self, other):
+			combined_props = {}
+			for p in (self.props, other.props):
+				combined_props.update(p)
+			return Fact(combined_props)
 
-			# 5. The green house's owner drinks coffee.
-			('col', 'gre', 'dri', 'cof'),
+		def transitive_combine(self, other):
+			for p1, r1 in self.props.items():
+				for p2, r2 in other_fact.props.items():
+					if p1 == p2:
+						return self + other_fact.adjust_rel_values(r1 - r2)
+			return None
 
-			# 6. The owner who smokes Pall Mall rears birds.
-			('smo', 'pal', 'pet', 'bir'),
+	def get_initial_facts(self):
+		self.facts = []
+		perm_i = iter(self.perm)
+		f = open('facts.txt', 'r')
 
-			# 7. The owner of the yellow house smokes Dunhill.
-			('col', 'yel', 'smo', 'dun'),
+		for line in f:
+			if line[0] is '#' or line[0] is '\n':
+				continue
+			toks = line.strip().split()
+			if len(toks) < 4:
+				continue
 
-			# 8. The owner living in the center house drinks milk.
-			('pos', 2, 'dri', 'mil'),
+			k1, v1, k2, v2 = toks[:4]
 
-			# 9. The Norwegian lives in the first house.
-			('nat', 'nor', 'pos', 0),
+			# Unknown "relative position" values
+			if len(toks) > 4:
+				rel2 = toks[4]
+				if rel2 is '?':
+					rel2 = next(perm_i, 0)
+			else:
+				rel2 = 0
 
-			# 10. The owner who smokes Blends lives next to the one who keeps
-			# cats.
-			('smo', 'ble', 'pet', 'cat', a),
-
-			# 11. The owner who keeps the horse lives next to the one who smokes
-			# Dunhill.
-			('pet', 'hor', 'smo', 'dun', b),
-
-			# 12. The owner who smokes Bluemasters drinks beer.
-			('smo', 'blu', 'dri', 'bee'),
-
-			# 13. The German smokes Prince.
-			('nat', 'ger', 'smo', 'pri'),
-
-			# 14. The Norwegian lives next to the blue house.
-			('nat', 'nor', 'col', 'blu', c),
-
-			# 15. The owner who smokes Blends lives next to the one who drinks
-			# water.
-			('smo', 'ble', 'dri', 'wat', d)
-		]
+			self.facts += [ self.Fact({(k1, v1): 0, (k2, v2): rel2}) ]
 
 	def populate_houses(self):
 		for h in self.houses:
 			h.add_possible('pet', 'fis')
-			for f in self.facts:
-				h.add_possible(f[0], f[1])
-				h.add_possible(f[2], f[3])
+			for fact in self.facts:
+				for key, val in fact.props:
+					h.add_possible(key, val)
 
 	# rel = find house to the right (positive) or left (negative)
 	# of the house with key=val.
@@ -209,14 +212,14 @@ class Puzzle:
 				self.current_fact,
 				len(self.facts))
 
-	def houses_str(self, colour_val=None):
+	def houses_str(self, colour_key, colour_val=None):
 		ret = '{}\n'.format(self)
 		for prop in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
 			ret += '{}\t'.format(prop)
 			for house in self.houses:
 				val = house.props[prop]
 				if house.prop_found(prop):
-					if val is colour_val:
+					if val is colour_val and prop is colour_key:
 						val = termcolor.colored(val, 'green')
 					ret += '{}\t'.format(val)
 				else:
@@ -228,7 +231,7 @@ class Puzzle:
 		self.perm = perm
 		self.no_of_cycles = 0
 		self.current_fact = 0
-		self.set_facts()
+		self.get_initial_facts()
 		self.houses = []
 		for i in range(self.no_of_houses):
 			self.houses += [ self.House(i, self) ]
@@ -246,10 +249,8 @@ class Puzzle:
 					raise self.PuzzleFinish(False, "No new information added "
 							"during cycle #{}.".format(self.no_of_cycles))
 		except self.PuzzleFinish as f:
-			print("{}\n{}".format(self, f))
-			if verbose:
-				print("{}".format('=' * 50))
-			print
+			print(self.value_mention_count_str())
+			print("{}\n{}\n{}".format(self, f, '=' * 50 if verbose else ''))
 
 def main():
 	ap = argparse.ArgumentParser(
