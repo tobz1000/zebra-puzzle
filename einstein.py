@@ -2,6 +2,7 @@
 import itertools
 import termcolor
 import argparse
+import copy
 
 '''
 Now with classes!
@@ -224,9 +225,7 @@ class Puzzle:
 		self.facts.remove(fact)
 
 	def __str__(self):
-		return 'Puzzle {:<16} Cycle {:>2}'.format(
-				str(self.perm),
-				self.no_of_cycles)
+		return 'Puzzle {}'.format(self.perm)
 
 	def houses_str(self, colour_key=None, colour_val=None):
 		ret = '{}\n'.format(self)
@@ -268,8 +267,6 @@ class Puzzle:
 
 	def __init__(self, perm):
 		self.perm = perm
-		self.no_of_cycles = 0
-		self.current_fact = 0
 		self.get_initial_facts()
 		self.houses = []
 		for i in range(self.no_of_houses):
@@ -282,18 +279,12 @@ class Puzzle:
 			if verbose:
 				print(self.facts_str())
 			# Attached as many facts to house positions as possible
-			while True:
-				self.no_of_cycles += 1
-				self.changed_last_cycle = False
-				for n, f in enumerate(self.facts):
-					self.current_fact = n + 1
-					self.try_fact(f)
-				if not self.changed_last_cycle:
-					break
+			for f in self.facts:
+				self.try_fact(f)
 			# Remaining facts: fork the Puzzle, try to insert first Fact at each
 			# possible offset of some arbitrary prop. While the insert is
 			# successful, recursively attempt this with each following Fact.
-			for f in facts:
+			for f in self.facts:
 				pass
 		except self.PuzzleFinish as f:
 			print("{}\n{}\n{}".format(self, f, '=' * 50 if verbose else ''))
