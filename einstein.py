@@ -106,13 +106,17 @@ class Puzzle:
 				self.set_prop_value(key, val)
 
 	# A dictionary of properties (tuples) with a relative position from one
-	# another.
+	# another
 	class Fact():
 		def __init__(self, props):
 			self.props = props
 
 		def __str__(self):
-			return str(self.props)
+			ret = ''
+			for p, r in self.props.items():
+				k, v = p
+				ret += '{:<3} {:<3} {:>2}; '.format(k, v, r)
+			return ret
 
 		def adjust_rel_values(self, adj):
 			for p, r in self.props.items():
@@ -212,30 +216,37 @@ class Puzzle:
 				fact.adjust_rel_values(test_house.props['pos'] - test_rel)
 				for add_prop, add_rel in fact.props.items():
 					add_house = self.find_house(*test_prop, rel=add_rel)
+					add_house = self.find_house('pos', add_rel)
 					self.single_prop_add(add_house, *add_prop)
 				return
 
 	def __str__(self):
-		return 'Puzzle {}\tCycle\t{}\tFact\t{}/{} {}'.format(
-				self.perm,
+		return 'Puzzle {:<16} Cycle {:>2} Fact {:>2}/{:>2}'.format(
+				str(self.perm),
 				self.no_of_cycles,
 				self.current_fact,
-				len(self.facts),
-				self.facts[self.current_fact - 1])
+				len(self.facts))
 
-	def houses_str(self, colour_key, colour_val=None):
+	def houses_str(self, colour_key=None, colour_val=None):
 		ret = '{}\n'.format(self)
-		for prop in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
-			ret += '{}\t'.format(prop)
+		for key in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
+			ret += '{:4}'.format(key)
 			for house in self.houses:
-				val = house.props[prop]
-				if house.prop_found(prop):
-					if val is colour_val and prop is colour_key:
-						val = termcolor.colored(val, 'green')
-					ret += '{}\t'.format(val)
+				val = house.props[key]
+				if house.prop_found(key):
+					val_fmt = '{:^6}'.format(val)
+					if ((key, val) == (colour_key, colour_val)):
+						val_fmt = termcolor.colored(val_fmt, 'green')
+					ret += val_fmt
 				else:
-					ret += '{}\t'.format('|' * len(val))
+					ret += '{:6}'.format('|' * len(val))
 			ret += '\n'
+		return ret
+
+	def facts_str(self):
+		ret = '{} facts:\n'.format(len(self.facts))
+		for n, f in enumerate(self.facts):
+			ret += '{:4}. {}\n'.format(n+1, f)
 		return ret
 
 	# Recursive: take first from list, combine if poss; move onto reduced list.
@@ -267,6 +278,8 @@ class Puzzle:
 
 		try:
 			self.combine_facts()
+			if verbose:
+				print(self.facts_str())
 			while True:
 				self.no_of_cycles += 1
 				self.changed_last_cycle = False
@@ -294,4 +307,3 @@ def main():
 
 if __name__ == '__main__':
 	main()
-	# Puzzle((1,1,1,1))
