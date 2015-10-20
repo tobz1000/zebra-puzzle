@@ -7,14 +7,9 @@ import argparse
 Now with classes!
 
 TODO:
-	* Create new facts for future cycles:
-		* E.g. facts 15 & 10 together imply either (depending on values of
-		a + d):
-			* Cat-owner drinks water
-			* Cat-owner lives 2 to the left/right of water-drinker
-		* Raise PuzzleFinish if range of a fact is too great (max-min >= 5)
-			* Possibly unnecessary - ultimately covered by invalid-access error
-	* Scan in facts from facts.txt to save on all the format-faffing
+	* After 1) combining facts and 2) adding positions of definite facts, add
+	step 3): insert remaining facts randomly until they're all inserted.
+	* Improve reading of facts.txt:
 		* Scan for '?'s first, and get number of vars to permutate from this
 		count.
 		* Probably best move the scan outside of Puzzle, and save list of dicts
@@ -22,8 +17,8 @@ TODO:
 	* Make clue-strings available in output
 	* Unify 'props': currently work as a dict in Houses, and as a tuple (which
 	is used as a dict-key) in Facts. Slightly confusing :)
-	* Cleanup use of 'is' and '==': limit 'is' to conceptual instance checks,
-	not equality checks for literals/ints etc.
+	* Cleanup the use of 'is' and '==': limit 'is' to conceptual instance
+	checks, not equality checks for literals/ints etc.
 
 There are five houses in five different colors in a row. In each house lives a
 person with a different nationality. The five owners drink a certain type of
@@ -210,22 +205,28 @@ class Puzzle:
 		house.set_prop_value(key, val)
 
 	def try_fact(self, fact):
-		for test_prop, test_rel in fact.props.items():
-			test_house = self.find_house(*test_prop)
-			if test_house is not None:
-				fact.adjust_rel_values(test_house.props['pos'] - test_rel)
-				for add_prop, add_rel in fact.props.items():
-					add_house = self.find_house(*test_prop, rel=add_rel)
-					add_house = self.find_house('pos', add_rel)
-					self.single_prop_add(add_house, *add_prop)
+		for prop, rel in fact.props.items():
+			house = self.find_house(*prop)
+			if house is not None:
+				fact.adjust_rel_values(house.props['pos'] - rel)
+				self.insert_fact(fact)
 				return
 
+	# Adds each property in a Fact to the House at the corresponding position
+	# (e.g. prop with rel=0 goes to House 0)
+	def insert_fact(self, fact):
+		for prop, rel in fact.props.items():
+			house = self.find_house('pos', rel)
+			if house is None:
+				raise self.PuzzleFinish(False, "Tried to add prop {} to "
+					"invalid house position ({})".format(prop, rel))
+			self.single_prop_add(house, *prop)
+		self.facts.remove(fact)
+
 	def __str__(self):
-		return 'Puzzle {:<16} Cycle {:>2} Fact {:>2}/{:>2}'.format(
+		return 'Puzzle {:<16} Cycle {:>2}'.format(
 				str(self.perm),
-				self.no_of_cycles,
-				self.current_fact,
-				len(self.facts))
+				self.no_of_cycles)
 
 	def houses_str(self, colour_key=None, colour_val=None):
 		ret = '{}\n'.format(self)
@@ -246,7 +247,7 @@ class Puzzle:
 	def facts_str(self):
 		ret = '{} facts:\n'.format(len(self.facts))
 		for n, f in enumerate(self.facts):
-			ret += '{:4}. {}\n'.format(n+1, f)
+			ret += '{:2}. {}\n'.format(n+1, f)
 		return ret
 
 	# Recursive: take first from list, combine if poss; move onto reduced list.
@@ -280,6 +281,7 @@ class Puzzle:
 			self.combine_facts()
 			if verbose:
 				print(self.facts_str())
+			# Attached as many facts to house positions as possible
 			while True:
 				self.no_of_cycles += 1
 				self.changed_last_cycle = False
@@ -287,8 +289,12 @@ class Puzzle:
 					self.current_fact = n + 1
 					self.try_fact(f)
 				if not self.changed_last_cycle:
-					raise self.PuzzleFinish(False, "No new information added "
-							"during cycle #{}.".format(self.no_of_cycles))
+					break
+			# Remaining facts: fork the Puzzle, try to insert first Fact at each
+			# possible offset of some arbitrary prop. While the insert is
+			# successful, recursively attempt this with each following Fact.
+			for f in facts:
+				pass
 		except self.PuzzleFinish as f:
 			print("{}\n{}\n{}".format(self, f, '=' * 50 if verbose else ''))
 
