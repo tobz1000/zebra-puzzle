@@ -8,12 +8,22 @@ Now with classes!
 
 TODO:
 	* Create new facts for future cycles:
-		* E.g. facts 15 & 10 together imply either
-				(depending on values of a + d):
+		* E.g. facts 15 & 10 together imply either (depending on values of
+		a + d):
 			* Cat-owner drinks water
 			* Cat-owner lives 2 to the left/right of water-drinker
+		* Raise PuzzleFinish if range of a fact is too great (max-min >= 5)
+			* Possibly unnecessary - ultimately covered by invalid-access error
 	* Scan in facts from facts.txt to save on all the format-faffing
+		* Scan for '?'s first, and get number of vars to permutate from this
+		count.
+		* Probably best move the scan outside of Puzzle, and save list of dicts
+		with '?'s first
 	* Make clue-strings available in output
+	* Unify 'props': currently work as a dict in Houses, and as a tuple (which
+	is used as a dict-key) in Facts. Slightly confusing :)
+	* Cleanup use of 'is' and '==': limit 'is' to conceptual instance checks,
+	not equality checks for literals/ints etc.
 
 There are five houses in five different colors in a row. In each house lives a
 person with a different nationality. The five owners drink a certain type of
@@ -72,6 +82,11 @@ class Puzzle:
 
 		def set_prop_value(self, key, val):
 			self.puzzle_inst.changed_last_cycle = True
+
+			for house in self.puzzle_inst.houses:
+				if house is not self:
+					h.remove_possible(key, val)
+
 			self.props[key] = val
 			if verbose:
 				print(self.puzzle_inst.houses_str(key, val))
@@ -107,8 +122,10 @@ class Puzzle:
 			for p1, r1 in self.props.items():
 				for p2, r2 in other.props.items():
 					if p1 == p2:
-						other_fact.adjust_rel_values(r1 - r2)
-						self.props.update(other_fact.props)
+						print("Combining {} and {} into:".format(self, other))
+						other.adjust_rel_values(r1 - r2)
+						self.props.update(other.props)
+						print(self)
 						return True
 			return False
 
@@ -128,9 +145,10 @@ class Puzzle:
 
 			# Unknown "relative position" values
 			if len(toks) > 4:
-				rel2 = toks[4]
-				if rel2 is '?':
+				if toks[4] == '?':
 					rel2 = next(perm_i, 0)
+				else:
+					rel2 = int(toks[4])
 			else:
 				rel2 = 0
 
@@ -146,7 +164,7 @@ class Puzzle:
 	# rel = find house to the right (positive) or left (negative)
 	# of the house with key=val.
 	def find_house(self, key, val, rel=None):
-		f = filter(lambda house: house.props.get(key) == val, self.houses)
+		f = list(filter(lambda house: house.props.get(key) == val, self.houses))
 
 		if len(f) is not 1:
 			return None
@@ -161,44 +179,39 @@ class Puzzle:
 		else:
 			return f[0]
 
-	# Returns whether or not to try and add the other way
-	def try_add_one_way(self, key1, val1, key2, val2, rel):
-		house = self.find_house(key1, val1, rel)
-
-		if house is None:
-			return True
-
-		if house.prop_found(key2):
+	def single_prop_add(self, house, key, val):
+		if house.prop_found(key):
 			# Already has value; only error out if value is different
-			if house.props[key2] is val2:
+			if house.props[key] == val:
 				return
 			else:
 				raise self.PuzzleFinish(False, "Can't add {} of {} to house "
-						"{}, already has value of {}".format(key2, val2,
-									house.props['pos'], house.props[key2]))
+						"{}, already has value of {}".format(key, val,
+									house.props['pos'], house.props[key]))
 		else:
 			if not val2 in house.props[key2]:
-				raise self.PuzzleFinish(False, "Can't add {} of {} to house {}"
-						"; value removed from possible list.".format(key2, val2,
+				raise self.PuzzleFinish(False, "Can't add {} of {} to house "
+						"{}, value removed from possible list.".format(key, val,
 								house.props['pos']))
 
-		h = self.find_house(key2, val2)
-		if h:
+		prev_assigned = self.find_house(key, val)
+		if prev_assigned:
 			raise self.PuzzleFinish(False, "Can't add {} of {} to house "
-					"{}, value already at house {}".format(key2, val2,
-								house.props['pos'], h.props['pos']))
+					"{}, value already at house {}".format(key, val,
+								house.props['pos'], prev_assigned.props['pos']))
 
-		self.changed_last_cycle = True
-		house.set_prop_value(key2, val2)
-
-		for h in self.houses:
-			if h is not house:
-				h.remove_possible(key2, val2)
+		house.set_prop_value(key, val)
 
 	def try_fact(self, fact):
-		pass
-		# self.try_add_one_way(key1, val1, key2, val2, rel)
-		# self.try_add_one_way(key2, val2, key1, val1, -rel)
+		for test_prop, test_rel in fact.props.items():
+			test_k, test_v = test_prop
+			test_house = self.find_house(test_k, test_v)
+			if test_house is not None:
+				fact.adjust_rel_values(test_house.props['pos'] - test_rel)
+				for add_prop, add_rel in fact.props.items():
+					add_house = find_house(test_k, test_v, add_rel)
+					self.single_prop_add(add_house, *add_prop)
+				return
 
 	def __str__(self):
 		return 'Puzzle {}\tCycle\t{}\tFact\t{}/{}'.format(
@@ -222,13 +235,21 @@ class Puzzle:
 			ret += '\n'
 		return ret
 
-	# Recursive: take first from list, combine if poss; move onto reduced list
-	def combine_facts(self, facts):
-		f1 = next(facts)
+	# Recursive: take first from list, combine if poss; move onto reduced list.
+	def combine_facts(self, facts=None):
+		if facts is None or facts is self.facts:
+			# Copy the Puzzle's list on first call for modification
+			facts = list(self.facts)
+
+		if len(facts) == 0:
+			return
+
+		f1 = facts.pop()
 		for f2 in facts:
 			if f2.try_add_transitive(f1):
-				facts.remove()
-				self.facts
+				self.facts.remove(f1)
+				break
+		self.combine_facts(facts)
 
 	def __init__(self, perm):
 		self.perm = perm
@@ -242,16 +263,12 @@ class Puzzle:
 		self.populate_houses()
 
 		try:
+			self.combine_facts()
 			while True:
 				self.no_of_cycles += 1
 				self.changed_last_cycle = False
-				for n, f1 in enumerate(self.facts):
-					following_facts = itertools.islice(self.facts, n, None)
-					for f2 in following_facts:
-						combined_fact = f.transitive_combine(f2):
-						if combined_fact:
-							self.facts.remove(f1)
-							self.facts.remove(f2)
+				for n, f in enumerate(self.facts):
+					self.current_fact = n + 1
 					self.try_fact(f)
 				if not self.changed_last_cycle:
 					raise self.PuzzleFinish(False, "No new information added "
