@@ -85,7 +85,7 @@ class Puzzle:
 
 			for house in self.puzzle_inst.houses:
 				if house is not self:
-					h.remove_possible(key, val)
+					house.remove_possible(key, val)
 
 			self.props[key] = val
 			if verbose:
@@ -122,10 +122,8 @@ class Puzzle:
 			for p1, r1 in self.props.items():
 				for p2, r2 in other.props.items():
 					if p1 == p2:
-						print("Combining {} and {} into:".format(self, other))
 						other.adjust_rel_values(r1 - r2)
 						self.props.update(other.props)
-						print(self)
 						return True
 			return False
 
@@ -142,6 +140,11 @@ class Puzzle:
 				continue
 
 			k1, v1, k2, v2 = toks[:4]
+
+			if k1 == 'pos':
+				v1 = int(v1)
+			if k2 == 'pos':
+				v2 = int(v2)
 
 			# Unknown "relative position" values
 			if len(toks) > 4:
@@ -189,7 +192,7 @@ class Puzzle:
 						"{}, already has value of {}".format(key, val,
 									house.props['pos'], house.props[key]))
 		else:
-			if not val2 in house.props[key2]:
+			if not val in house.props[key]:
 				raise self.PuzzleFinish(False, "Can't add {} of {} to house "
 						"{}, value removed from possible list.".format(key, val,
 								house.props['pos']))
@@ -204,21 +207,21 @@ class Puzzle:
 
 	def try_fact(self, fact):
 		for test_prop, test_rel in fact.props.items():
-			test_k, test_v = test_prop
-			test_house = self.find_house(test_k, test_v)
+			test_house = self.find_house(*test_prop)
 			if test_house is not None:
 				fact.adjust_rel_values(test_house.props['pos'] - test_rel)
 				for add_prop, add_rel in fact.props.items():
-					add_house = find_house(test_k, test_v, add_rel)
+					add_house = self.find_house(*test_prop, rel=add_rel)
 					self.single_prop_add(add_house, *add_prop)
 				return
 
 	def __str__(self):
-		return 'Puzzle {}\tCycle\t{}\tFact\t{}/{}'.format(
+		return 'Puzzle {}\tCycle\t{}\tFact\t{}/{} {}'.format(
 				self.perm,
 				self.no_of_cycles,
 				self.current_fact,
-				len(self.facts))
+				len(self.facts),
+				self.facts[self.current_fact - 1])
 
 	def houses_str(self, colour_key, colour_val=None):
 		ret = '{}\n'.format(self)
@@ -276,6 +279,8 @@ class Puzzle:
 		except self.PuzzleFinish as f:
 			print("{}\n{}\n{}".format(self, f, '=' * 50 if verbose else ''))
 
+verbose = False
+
 def main():
 	ap = argparse.ArgumentParser(
 			description='Einstein\'s puzzle-solver.')
@@ -289,3 +294,4 @@ def main():
 
 if __name__ == '__main__':
 	main()
+	# Puzzle((1,1,1,1))
