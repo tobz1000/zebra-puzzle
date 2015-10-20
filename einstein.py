@@ -42,8 +42,6 @@ The question is: who owns the fish?
 
 class Puzzle:
 	no_of_houses = 5
-	# Max times to try each fact
-	max_cycles = 20
 
 	class PuzzleFinish(Exception):
 		def __init__(self, solved, message=None):
@@ -105,18 +103,14 @@ class Puzzle:
 			for p, r in self.props.items():
 				self.props[p] += adj
 
-		def __add__(self, other):
-			combined_props = {}
-			for p in (self.props, other.props):
-				combined_props.update(p)
-			return Fact(combined_props)
-
-		def transitive_combine(self, other):
+		def try_add_transitive(self, other):
 			for p1, r1 in self.props.items():
-				for p2, r2 in other_fact.props.items():
+				for p2, r2 in other.props.items():
 					if p1 == p2:
-						return self + other_fact.adjust_rel_values(r1 - r2)
-			return None
+						other_fact.adjust_rel_values(r1 - r2)
+						self.props.update(other_fact.props)
+						return True
+			return False
 
 	def get_initial_facts(self):
 		self.facts = []
@@ -201,9 +195,10 @@ class Puzzle:
 			if h is not house:
 				h.remove_possible(key2, val2)
 
-	def try_fact(self, key1, val1, key2, val2, rel=0):
-		self.try_add_one_way(key1, val1, key2, val2, rel)
-		self.try_add_one_way(key2, val2, key1, val1, -rel)
+	def try_fact(self, fact):
+		pass
+		# self.try_add_one_way(key1, val1, key2, val2, rel)
+		# self.try_add_one_way(key2, val2, key1, val1, -rel)
 
 	def __str__(self):
 		return 'Puzzle {}\tCycle\t{}\tFact\t{}/{}'.format(
@@ -227,6 +222,14 @@ class Puzzle:
 			ret += '\n'
 		return ret
 
+	# Recursive: take first from list, combine if poss; move onto reduced list
+	def combine_facts(self, facts):
+		f1 = next(facts)
+		for f2 in facts:
+			if f2.try_add_transitive(f1):
+				facts.remove()
+				self.facts
+
 	def __init__(self, perm):
 		self.perm = perm
 		self.no_of_cycles = 0
@@ -242,14 +245,18 @@ class Puzzle:
 			while True:
 				self.no_of_cycles += 1
 				self.changed_last_cycle = False
-				for n, f in enumerate(self.facts):
-					self.current_fact = n + 1
-					self.try_fact(*f)
+				for n, f1 in enumerate(self.facts):
+					following_facts = itertools.islice(self.facts, n, None)
+					for f2 in following_facts:
+						combined_fact = f.transitive_combine(f2):
+						if combined_fact:
+							self.facts.remove(f1)
+							self.facts.remove(f2)
+					self.try_fact(f)
 				if not self.changed_last_cycle:
 					raise self.PuzzleFinish(False, "No new information added "
 							"during cycle #{}.".format(self.no_of_cycles))
 		except self.PuzzleFinish as f:
-			print(self.value_mention_count_str())
 			print("{}\n{}\n{}".format(self, f, '=' * 50 if verbose else ''))
 
 def main():
