@@ -69,16 +69,15 @@ class Puzzle:
 			self.props['pos'] = pos
 
 		def __str__(self):
-			ret = ''
-			for k, v in self.props.iteritems():###
-				ret += k + ' ' + str(v) + '\n'
-			return ret
+			return "House {}".format(self.props['pos'])
 
 		def prop_found(self, key):
 			val = self.props.get(key)
 			return val is not None and not isinstance(val, list)
 
 		def set_prop_value(self, key, val):
+			if verbose:
+				print("    {}: Setting {} to {}".format(self, key, val))
 			self.puzzle_inst.changed_last_cycle = True
 
 			for house in self.puzzle_inst.houses:
@@ -99,19 +98,23 @@ class Puzzle:
 				self.props[key].remove(val)
 
 			if len(self.props[key]) is 1:
+				if verbose:
+					print("{}: Only one possible value of \'{}\'...".format(
+							key, self))
 				self.set_prop_value(key, val)
 
 	# A dictionary of properties (tuples) with a relative position from one
 	# another
 	class Fact():
 		def __init__(self, props):
+			self.in_use = False
 			self.props = props
 
 		def __str__(self):
 			ret = ''
 			for p, r in self.props.items():
 				k, v = p
-				ret += '{:<3} {:<3} {:>2}; '.format(k, v, r)
+				ret += '({:<3} {:<3} {:>2}) '.format(k, v, r)
 			return ret
 
 		def adjust_rel_values(self, adj):
@@ -119,6 +122,7 @@ class Puzzle:
 				self.props[p] += adj
 
 		def try_add_transitive(self, other):
+			self.in_use = True
 			for p1, r1 in self.props.items():
 				for p2, r2 in other.props.items():
 					if p1 == p2:
@@ -126,9 +130,9 @@ class Puzzle:
 						self.props.update(other.props)
 						return True
 			return False
+			self.in_use = False
 
 	def get_initial_facts(self):
-		self.facts = []
 		perm_i = iter(self.perm)
 		f = open('facts.txt', 'r')
 
@@ -155,12 +159,12 @@ class Puzzle:
 			else:
 				rel2 = 0
 
-			self.facts += [ self.Fact({(k1, v1): 0, (k2, v2): rel2}) ]
+			self.unused_facts += [ self.Fact({(k1, v1): 0, (k2, v2): rel2}) ]
 
 	def populate_houses(self):
 		for h in self.houses:
 			h.add_possible('pet', 'fis')
-			for fact in self.facts:
+			for fact in self.unused_facts:
 				for key, val in fact.props:
 					h.add_possible(key, val)
 
@@ -211,30 +215,48 @@ class Puzzle:
 			if house is not None:
 				fact.adjust_rel_values(house.props['pos'] - rel)
 				self.insert_fact(fact)
-				self.facts.remove(fact)
 				return
 
 	# Adds each property in a Fact to the House at the corresponding position
 	# (e.g. prop with rel=0 goes to House 0)
 	def insert_fact(self, fact):
+		fact.in_use = True
+		if verbose:
+			print("Adding props from Fact {}...".format(fact))
 		for prop, rel in fact.props.items():
 			house = self.find_house('pos', rel)
 			if house is None:
 				raise self.PuzzleFinish(False, "Tried to add prop {} to "
 					"invalid house position ({})".format(prop, rel))
 			self.single_prop_add(house, *prop)
+		self.unused_facts.remove(fact)
+		self.used_facts += [fact]
+		fact.in_use = False
 
 	def __str__(self):
+		sections = (
+			self.houses_str_gen(),
+			self.facts_str_gen(self.unused_facts, "Unused facts"),
+			self.facts_str_gen(self.used_facts, "Used facts"))
+		# Padding size. Format doesn't like len=0, so minimum of 1
+		seg_lens = [1] * len(sections)
+
 		ret = 'Puzzle {}\n'.format(self.perm)
-		for house_line, fact_line in itertools.zip_longest(self.houses_str_gen(),
-				self.facts_str_gen()):
-			hlen = len(house_line) if house_line else hlen
-			ret += '{:{hlen}} {}\n'.format(house_line or '', fact_line or '',
-					hlen=hlen)
+		for combined_line in itertools.zip_longest(*sections):
+			for n, line_seg in enumerate(combined_line):
+				# When a generator finishes before the others, zip returns None
+				line_seg = line_seg or ''
+				seg_lens[n] = max(seg_lens[n], len(line_seg))
+				ret += '{:{len}}'.format(line_seg, len=seg_lens[n])
+			ret += '\n'
 		return ret
 
 
 	def houses_str_gen(self, colour_key=None, colour_val=None):
+		key_len = 4
+		val_len = 6
+		yield "{:{line_len}}".format("Houses:",
+				line_len=key_len + val_len * len(self.houses))
 		for key in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
 			ret = '{:4}'.format(key)
 			for house in self.houses:
@@ -248,15 +270,22 @@ class Puzzle:
 					ret += '{:6}'.format('|' * len(val))
 			yield ret
 
-	def facts_str_gen(self):
-		for n, f in enumerate(self.facts):
-			yield '{:2}. {}'.format(n+1, f)
+	def facts_str_gen(self, facts, title):
+		max_len = 0
+		lines = []
+		for n, f in enumerate(facts):
+			line = '{:2}. {}'.format(n+1, f)
+			max_len = max(max_len, len(line))
+			lines += [line]
+		yield "{:{len}}".format(title+':', len=max_len)
+		for line in lines:
+			yield line
 
 	# Recursive: take first from list, combine if poss; move onto reduced list.
 	def combine_facts(self, facts=None):
-		if facts is None or facts is self.facts:
+		if facts is None or facts is self.unused_facts:
 			# Copy the Puzzle's list on first call for modification
-			facts = list(self.facts)
+			facts = list(self.unused_facts)
 
 		if len(facts) == 0:
 			return
@@ -264,15 +293,15 @@ class Puzzle:
 		f1 = facts.pop()
 		for f2 in facts:
 			if f2.try_add_transitive(f1):
-				self.facts.remove(f1)
+				self.unused_facts.remove(f1)
 				break
 		self.combine_facts(facts)
 
 	def guess_facts(self):
-		if len(self.facts) == 0:
+		if len(self.unused_facts) == 0:
 			raise self.PuzzleFinish(True, "Done!")
 
-		f = self.facts.pop()
+		f = self.unused_facts[0]
 
 		# Take an arbitrary prop and try all possible positions
 		pivot_prop = next(iter(f.props))
@@ -292,8 +321,10 @@ class Puzzle:
 
 	def __init__(self, perm):
 		self.perm = perm
-		self.get_initial_facts()
 		self.houses = []
+		self.unused_facts = []
+		self.used_facts = []
+		self.get_initial_facts()
 		for i in range(self.no_of_houses):
 			self.houses += [ self.House(i, self) ]
 
@@ -302,14 +333,15 @@ class Puzzle:
 		try:
 			self.combine_facts()
 			# Attach as many facts to house positions as possible
-			for f in self.facts:
+			for f in copy.copy(self.unused_facts):
 				self.try_definite_fact(f)
 			# Remaining facts: fork the Puzzle, try to insert first Fact at each
 			# possible offset of some arbitrary prop. While the insert is
 			# successful, recursively attempt this with each following Fact.
 			self.guess_facts()
+			print(self)
 		except self.PuzzleFinish as f:
-			print("{}\n{}\n{}".format(self, f, '=' * 50 if verbose else ''))
+			print("{deco}\n{}\n{}\n{deco}".format(self, f, deco='=' * 80))
 
 verbose = False
 
