@@ -108,6 +108,7 @@ class Puzzle:
 	class Fact():
 		def __init__(self, props):
 			self.in_use = False
+			self.used = False
 			self.props = props
 
 		def __str__(self):
@@ -122,7 +123,6 @@ class Puzzle:
 				self.props[p] += adj
 
 		def try_add_transitive(self, other):
-			self.in_use = True
 			for p1, r1 in self.props.items():
 				for p2, r2 in other.props.items():
 					if p1 == p2:
@@ -130,7 +130,6 @@ class Puzzle:
 						self.props.update(other.props)
 						return True
 			return False
-			self.in_use = False
 
 	def get_initial_facts(self):
 		perm_i = iter(self.perm)
@@ -159,12 +158,12 @@ class Puzzle:
 			else:
 				rel2 = 0
 
-			self.unused_facts += [ self.Fact({(k1, v1): 0, (k2, v2): rel2}) ]
+			self.facts += [ self.Fact({(k1, v1): 0, (k2, v2): rel2}) ]
 
 	def populate_houses(self):
 		for h in self.houses:
 			h.add_possible('pet', 'fis')
-			for fact in self.unused_facts:
+			for fact in self.facts:
 				for key, val in fact.props:
 					h.add_possible(key, val)
 
@@ -220,6 +219,9 @@ class Puzzle:
 	# Adds each property in a Fact to the House at the corresponding position
 	# (e.g. prop with rel=0 goes to House 0)
 	def insert_fact(self, fact):
+		if fact.used:
+			raise self.PuzzleFinish(False, "Tried to reuse Fact {}".format(
+					fact))
 		fact.in_use = True
 		if verbose:
 			print("Adding props from Fact {}...".format(fact))
@@ -229,34 +231,35 @@ class Puzzle:
 				raise self.PuzzleFinish(False, "Tried to add prop {} to "
 					"invalid house position ({})".format(prop, rel))
 			self.single_prop_add(house, *prop)
-		self.unused_facts.remove(fact)
-		self.used_facts += [fact]
 		fact.in_use = False
+		fact.used = True
 
 	def __str__(self):
 		sections = (
 			self.houses_str_gen(),
-			self.facts_str_gen(self.unused_facts, "Unused facts"),
-			self.facts_str_gen(self.used_facts, "Used facts"))
-		# Padding size. Format doesn't like len=0, so minimum of 1
-		seg_lens = [1] * len(sections)
+			self.facts_str_gen())
+
+		# Padding sizes should be first yield
+		seg_lens = [None] * len(sections)
+		for n, gen in enumerate(sections):
+			seg_lens[n] = next(gen)
 
 		ret = 'Puzzle {}\n'.format(self.perm)
 		for combined_line in itertools.zip_longest(*sections):
-			for n, line_seg in enumerate(combined_line):
+			for line_seg, seg_len in zip(combined_line, seg_lens):
 				# When a generator finishes before the others, zip returns None
 				line_seg = line_seg or ''
-				seg_lens[n] = max(seg_lens[n], len(line_seg))
-				ret += '{:{len}}'.format(line_seg, len=seg_lens[n])
+				ret += '{:{len}}'.format(line_seg, len=seg_len)
 			ret += '\n'
 		return ret
 
-
+	# Yields length of section before any lines
 	def houses_str_gen(self, colour_key=None, colour_val=None):
 		key_len = 4
 		val_len = 6
-		yield "{:{line_len}}".format("Houses:",
-				line_len=key_len + val_len * len(self.houses))
+		max_len = key_len + val_len * len(self.houses)
+		yield max_len
+		yield "{:{len}}".format("Houses:", len=max_len)
 		for key in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
 			ret = '{:4}'.format(key)
 			for house in self.houses:
@@ -270,22 +273,26 @@ class Puzzle:
 					ret += '{:6}'.format('|' * len(val))
 			yield ret
 
-	def facts_str_gen(self, facts, title):
+	# Yields length of section before any lines
+	def facts_str_gen(self):
 		max_len = 0
 		lines = []
-		for n, f in enumerate(facts):
+		for n, f in enumerate(self.facts):
 			line = '{:2}. {}'.format(n+1, f)
 			max_len = max(max_len, len(line))
-			lines += [line]
-		yield "{:{len}}".format(title+':', len=max_len)
+			line_colour = 'red' if f.in_use else 'white'
+			line_attrs = ['dark'] if f.used else []
+			lines += [termcolor.colored(line, line_colour, attrs=line_attrs)]
+		yield max_len
+		yield "{:{len}}".format('Facts:', len=max_len)
 		for line in lines:
 			yield line
 
 	# Recursive: take first from list, combine if poss; move onto reduced list.
 	def combine_facts(self, facts=None):
-		if facts is None or facts is self.unused_facts:
+		if facts is None or facts is self.facts:
 			# Copy the Puzzle's list on first call for modification
-			facts = list(self.unused_facts)
+			facts = list(self.facts)
 
 		if len(facts) == 0:
 			return
@@ -293,23 +300,23 @@ class Puzzle:
 		f1 = facts.pop()
 		for f2 in facts:
 			if f2.try_add_transitive(f1):
-				self.unused_facts.remove(f1)
+				self.facts.remove(f1)
 				break
 		self.combine_facts(facts)
 
 	def guess_facts(self):
-		if len(self.unused_facts) == 0:
+		fact = next((f for f in self.facts if not f.used), None)
+		print("FACT={}".format(fact))
+		if fact is None:
 			raise self.PuzzleFinish(True, "Done!")
 
-		f = self.unused_facts[0]
-
 		# Take an arbitrary prop and try all possible positions
-		pivot_prop = next(iter(f.props))
+		pivot_prop = next(iter(fact.props))
 		for i in range(0, self.no_of_houses):
-			f.adjust_rel_values(i - f.props[pivot_prop])
+			fact.adjust_rel_values(i - fact.props[pivot_prop])
 			p_cpy = copy.deepcopy(self)
 			try:
-				p_cpy.insert_fact(f)
+				p_cpy.insert_fact(fact)
 			# Catch incorrect inserts here; don't bail on entire Puzzle
 			except self.PuzzleFinish:
 				continue
@@ -322,8 +329,7 @@ class Puzzle:
 	def __init__(self, perm):
 		self.perm = perm
 		self.houses = []
-		self.unused_facts = []
-		self.used_facts = []
+		self.facts = []
 		self.get_initial_facts()
 		for i in range(self.no_of_houses):
 			self.houses += [ self.House(i, self) ]
@@ -333,7 +339,7 @@ class Puzzle:
 		try:
 			self.combine_facts()
 			# Attach as many facts to house positions as possible
-			for f in copy.copy(self.unused_facts):
+			for f in self.facts:
 				self.try_definite_fact(f)
 			# Remaining facts: fork the Puzzle, try to insert first Fact at each
 			# possible offset of some arbitrary prop. While the insert is
