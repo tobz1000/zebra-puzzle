@@ -8,8 +8,10 @@ import copy
 Now with classes!
 
 TODO:
-	* After 1) combining facts and 2) adding positions of definite facts, add
-	step 3): insert remaining facts randomly until they're all inserted.
+	* Not solved. Improve string output, so state of puzzle shows the
+	house-grid, and unused facts. Then print this after 1) inserting definites;
+	2) coming to the end of a guess_facts() branch.
+		* Keep track of facts used in guess_facts, so these can be printed too.
 	* Improve reading of facts.txt:
 		* Scan for '?'s first, and get number of vars to permutate from this
 		count.
@@ -205,12 +207,13 @@ class Puzzle:
 
 		house.set_prop_value(key, val)
 
-	def try_fact(self, fact):
+	def try_definite_fact(self, fact):
 		for prop, rel in fact.props.items():
 			house = self.find_house(*prop)
 			if house is not None:
 				fact.adjust_rel_values(house.props['pos'] - rel)
 				self.insert_fact(fact)
+				self.facts.remove(fact)
 				return
 
 	# Adds each property in a Fact to the House at the corresponding position
@@ -222,7 +225,6 @@ class Puzzle:
 				raise self.PuzzleFinish(False, "Tried to add prop {} to "
 					"invalid house position ({})".format(prop, rel))
 			self.single_prop_add(house, *prop)
-		self.facts.remove(fact)
 
 	def __str__(self):
 		return 'Puzzle {}'.format(self.perm)
@@ -265,6 +267,28 @@ class Puzzle:
 				break
 		self.combine_facts(facts)
 
+	def guess_facts(self):
+		if len(self.facts) == 0:
+			raise self.PuzzleFinish(True, "Done!")
+
+		f = self.facts.pop()
+
+		# Take an arbitrary prop and try all possible positions
+		pivot_prop = next(iter(f.props))
+		for i in range(0, self.no_of_houses):
+			f.adjust_rel_values(i - f.props[pivot_prop])
+			p_cpy = copy.deepcopy(self)
+			try:
+				p_cpy.insert_fact(f)
+			# Catch incorrect inserts here; don't bail on entire Puzzle
+			except self.PuzzleFinish:
+				continue
+			p_cpy.guess_facts()
+
+		raise self.PuzzleFinish(False, "Couldn't find a working combination "
+			"for remaining Facts")
+
+
 	def __init__(self, perm):
 		self.perm = perm
 		self.get_initial_facts()
@@ -278,14 +302,13 @@ class Puzzle:
 			self.combine_facts()
 			if verbose:
 				print(self.facts_str())
-			# Attached as many facts to house positions as possible
+			# Attach as many facts to house positions as possible
 			for f in self.facts:
-				self.try_fact(f)
+				self.try_definite_fact(f)
 			# Remaining facts: fork the Puzzle, try to insert first Fact at each
 			# possible offset of some arbitrary prop. While the insert is
 			# successful, recursively attempt this with each following Fact.
-			for f in self.facts:
-				pass
+			self.guess_facts()
 		except self.PuzzleFinish as f:
 			print("{}\n{}\n{}".format(self, f, '=' * 50 if verbose else ''))
 
