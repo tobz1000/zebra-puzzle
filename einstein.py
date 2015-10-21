@@ -86,8 +86,6 @@ class Puzzle:
 					house.remove_possible(key, val)
 
 			self.props[key] = val
-			if verbose:
-				print(self.puzzle_inst.houses_str(key, val))
 
 		def add_possible(self, key, val):
 			if not key in self.props:
@@ -227,12 +225,18 @@ class Puzzle:
 			self.single_prop_add(house, *prop)
 
 	def __str__(self):
-		return 'Puzzle {}'.format(self.perm)
+		ret = 'Puzzle {}\n'.format(self.perm)
+		for house_line, fact_line in itertools.zip_longest(self.houses_str_gen(),
+				self.facts_str_gen()):
+			hlen = len(house_line) if house_line else hlen
+			ret += '{:{hlen}} {}\n'.format(house_line or '', fact_line or '',
+					hlen=hlen)
+		return ret
 
-	def houses_str(self, colour_key=None, colour_val=None):
-		ret = '{}\n'.format(self)
+
+	def houses_str_gen(self, colour_key=None, colour_val=None):
 		for key in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
-			ret += '{:4}'.format(key)
+			ret = '{:4}'.format(key)
 			for house in self.houses:
 				val = house.props[key]
 				if house.prop_found(key):
@@ -242,14 +246,11 @@ class Puzzle:
 					ret += val_fmt
 				else:
 					ret += '{:6}'.format('|' * len(val))
-			ret += '\n'
-		return ret
+			yield ret
 
-	def facts_str(self):
-		ret = '{} facts:\n'.format(len(self.facts))
+	def facts_str_gen(self):
 		for n, f in enumerate(self.facts):
-			ret += '{:2}. {}\n'.format(n+1, f)
-		return ret
+			yield '{:2}. {}'.format(n+1, f)
 
 	# Recursive: take first from list, combine if poss; move onto reduced list.
 	def combine_facts(self, facts=None):
@@ -300,8 +301,6 @@ class Puzzle:
 
 		try:
 			self.combine_facts()
-			if verbose:
-				print(self.facts_str())
 			# Attach as many facts to house positions as possible
 			for f in self.facts:
 				self.try_definite_fact(f)
