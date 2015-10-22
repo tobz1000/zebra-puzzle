@@ -100,7 +100,7 @@ class Puzzle:
 			if len(self.props[key]) is 1:
 				if verbose:
 					print("{}: Only one possible value of \'{}\'...".format(
-							key, self))
+							self, key))
 				self.set_prop_value(key, val)
 
 	# A dictionary of properties (tuples) with a relative position from one
@@ -304,23 +304,31 @@ class Puzzle:
 				break
 		self.combine_facts(facts)
 
+	def next_unused_fact(self):
+		return next((f for f in self.facts if not f.used), None)
+
+	def try_insert_next_fact(self):
+		fact = self.next_unused_fact()
+		try:
+			self.insert_fact(fact)
+		except self.PuzzleFinish as f:
+			print(f)
+			return False
+
+		return self.guess_facts()
+
 	def guess_facts(self):
-		fact = next((f for f in self.facts if not f.used), None)
-		print("FACT={}".format(fact))
+		fact = self.next_unused_fact()
 		if fact is None:
-			raise self.PuzzleFinish(True, "Done!")
+			return True
 
 		# Take an arbitrary prop and try all possible positions
 		pivot_prop = next(iter(fact.props))
 		for i in range(0, self.no_of_houses):
 			fact.adjust_rel_values(i - fact.props[pivot_prop])
 			p_cpy = copy.deepcopy(self)
-			try:
-				p_cpy.insert_fact(fact)
-			# Catch incorrect inserts here; don't bail on entire Puzzle
-			except self.PuzzleFinish:
-				continue
-			p_cpy.guess_facts()
+			if p_cpy.try_insert_next_fact():
+				return True
 
 		raise self.PuzzleFinish(False, "Couldn't find a working combination "
 			"for remaining Facts")
@@ -348,6 +356,8 @@ class Puzzle:
 			print(self)
 		except self.PuzzleFinish as f:
 			print("{deco}\n{}\n{}\n{deco}".format(self, f, deco='=' * 80))
+
+		print(self)
 
 verbose = False
 
