@@ -8,6 +8,7 @@ import copy
 Now with classes!
 
 TODO:
+	* May want to replace the deepcopy with an actual fork...?
 	* Not solved. Improve string output, so state of puzzle shows the
 	house-grid, and unused facts. Then print this after 1) inserting definites;
 	2) coming to the end of a guess_facts() branch.
@@ -71,7 +72,7 @@ class Puzzle:
 		def __str__(self):
 			return "House {}".format(self.props['pos'])
 
-		def prop_found(self, key):
+		def prop_is_set(self, key):
 			val = self.props.get(key)
 			return val is not None and not isinstance(val, list)
 
@@ -90,7 +91,7 @@ class Puzzle:
 			if not key in self.props:
 				self.props[key] = []
 
-			if not self.prop_found(key) and not val in self.props[key]:
+			if not self.prop_is_set(key) and not val in self.props[key]:
 				self.props[key] += [ val ]
 
 		def remove_possible(self, key, val):
@@ -185,28 +186,30 @@ class Puzzle:
 		else:
 			return f[0]
 
-	def single_prop_add(self, house, key, val):
-		if house.prop_found(key):
-			# Already has value; only error out if value is different
-			if house.props[key] == val:
-				return
-			else:
-				raise self.PuzzleFinish(False, "Can't add {} of {} to house "
-						"{}, already has value of {}".format(key, val,
-									house.props['pos'], house.props[key]))
-		else:
-			if not val in house.props[key]:
-				raise self.PuzzleFinish(False, "Can't add {} of {} to house "
-						"{}, value removed from possible list.".format(key, val,
-								house.props['pos']))
+	def single_prop_insert(self, house, key, val):
+		if house.prop_is_set(key):
+			raise self.PuzzleFinish(False, "Can't add {} of {} to house "
+					"{}, already has value of {}".format(key, val,
+							house.props['pos'], house.props[key]))
+
+		if not val in house.props[key]:
+			raise self.PuzzleFinish(False, "Can't add {} of {} to "
+					"{}, value removed from possible list.".format(key, val,
+							house))
 
 		prev_assigned = self.find_house(key, val)
 		if prev_assigned:
-			raise self.PuzzleFinish(False, "Can't add {} of {} to house "
-					"{}, value already at house {}".format(key, val,
-								house.props['pos'], prev_assigned.props['pos']))
+			raise self.PuzzleFinish(False, "Can't add {} of {} to "
+					"{}, value already at {}".format(key, val,
+							house, prev_assigned))
 
 		house.set_prop_value(key, val)
+
+	def single_prop_uninsert(self, house, key, val):
+		if not house.props[key] == val:
+			raise self.PuzzleFinish(False, "Can't uninsert {} of {} from "
+					"{}, value is {}".format(key, val, house, house.props[key]))
+
 
 	def try_definite_fact(self, fact):
 		for prop, rel in fact.props.items():
@@ -218,21 +221,30 @@ class Puzzle:
 
 	# Adds each property in a Fact to the House at the corresponding position
 	# (e.g. prop with rel=0 goes to House 0)
-	def insert_fact(self, fact):
+	def insert_fact(self, fact, uninsert=False):
+		invalid_state = not fact.used if uninsert else fact.used
 		if fact.used:
-			raise self.PuzzleFinish(False, "Tried to reuse Fact {}".format(
-					fact))
+			raise self.PuzzleFinish(False, "Tried to {} Fact {}".format(
+					"removing un-added" if uninsert else "reuse", fact))
 		fact.in_use = True
 		if verbose:
-			print("Adding props from Fact {}...".format(fact))
+			print("{}} props from Fact {}...".format(
+					"Removing" if uninsert else "Inserting", fact))
 		for prop, rel in fact.props.items():
 			house = self.find_house('pos', rel)
 			if house is None:
-				raise self.PuzzleFinish(False, "Tried to add prop {} to "
-					"invalid house position ({})".format(prop, rel))
-			self.single_prop_add(house, *prop)
+				raise self.PuzzleFinish(False, "Tried to {} prop {} on "
+					"invalid house position ({})".format(
+							"remove" if uninsert else "insert", prop, rel))
+			if uninsert:
+				self.single_prop_insert(house, *prop)
+			else:
+				self.single_prop_uninsert(house, *prop)
 		fact.in_use = False
 		fact.used = True
+
+	def remove_fact(self, fact):
+
 
 	def __str__(self):
 		sections = (
@@ -264,7 +276,7 @@ class Puzzle:
 			ret = '{:4}'.format(key)
 			for house in self.houses:
 				val = house.props[key]
-				if house.prop_found(key):
+				if house.prop_is_set(key):
 					val_fmt = '{:^6}'.format(val)
 					if ((key, val) == (colour_key, colour_val)):
 						val_fmt = termcolor.colored(val_fmt, 'green')
@@ -306,7 +318,6 @@ class Puzzle:
 
 	def guess_facts(self):
 		fact = next((f for f in self.facts if not f.used), None)
-		print("FACT={}".format(fact))
 		if fact is None:
 			raise self.PuzzleFinish(True, "Done!")
 
@@ -314,12 +325,11 @@ class Puzzle:
 		pivot_prop = next(iter(fact.props))
 		for i in range(0, self.no_of_houses):
 			fact.adjust_rel_values(i - fact.props[pivot_prop])
-			p_cpy = copy.deepcopy(self)
-			try:
-				p_cpy.insert_fact(fact)
 			# Catch incorrect inserts here; don't bail on entire Puzzle
+			try:
+				self.insert_fact(fact)
 			except self.PuzzleFinish:
-				continue
+				self.remove_fact(fact)
 			p_cpy.guess_facts()
 
 		raise self.PuzzleFinish(False, "Couldn't find a working combination "
