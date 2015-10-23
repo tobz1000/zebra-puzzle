@@ -8,6 +8,10 @@ import copy
 Now with classes!
 
 TODO:
+	* Support "question" facts fromt the facts file. Or more generally, allow
+	any Fact definition (any no. of props, any no. of relative positions)
+		* Maybe like this:
+			nat nor,pet fis -1,dri cof
 	* Not solved. Improve string output, so state of puzzle shows the
 	house-grid, and unused facts. Then print this after 1) inserting definites;
 	2) coming to the end of a guess_facts() branch.
@@ -93,7 +97,11 @@ class Puzzle:
 
 		def remove_possible(self, key, val):
 			if val in self.props.get(key):
-				self.props[key].remove(val)
+				try:
+					self.props[key].remove(val)
+				except AttributeError:
+					print("slot = {}({}) val-to-remove = {}".format(self.props[key], len(self.props[key]), val))
+					raise
 
 				if len(self.props[key]) is 1:
 					self.set_prop_value(key, val)
@@ -131,7 +139,7 @@ class Puzzle:
 
 	def get_initial_facts(self):
 		perm_i = iter(self.perm)
-		f = open('facts.txt', 'r')
+		f = open('facts2.txt', 'r')
 
 		for line in f:
 			if line[0] is '#' or line[0] is '\n':
@@ -160,7 +168,9 @@ class Puzzle:
 
 	def populate_houses(self):
 		for h in self.houses:
-			h.add_possible('pet', 'fis')
+			# h.add_possible('pet', 'fis')
+			h.add_possible('pet', 'zeb')
+			h.add_possible('dri', 'wat')
 			for fact in self.facts:
 				for key, val in fact.props:
 					h.add_possible(key, val)

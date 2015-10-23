@@ -25,12 +25,10 @@ pos 2 dri mil
 # 9. The Norwegian lives in the first house.
 nat nor pos 0
 
-# 10. The owner who smokes Blends lives next to the one who keeps
-# cats.
+# 10. The owner who smokes Blends lives next to the one who keeps cats.
 smo ble pet cat ?
 
-# 11. The owner who keeps the horse lives next to the one who smokes
-# Dunhill.
+# 11. The owner who keeps the horse lives next to the one who smokes Dunhill.
 pet hor smo dun ?
 
 # 12. The owner who smokes Bluemasters drinks beer.
@@ -44,3 +42,6 @@ nat nor col blu ?
 
 # 15. The owner who smokes Blends lives next to the one who drinks water.
 smo ble dri wat ?
+
+# Who owns the fish?
+#pet fis
