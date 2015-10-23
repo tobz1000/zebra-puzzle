@@ -57,9 +57,7 @@ class Puzzle:
 			self.message = message
 
 		def __str__(self):
-			return "{}: {}".format(
-					"SOLVED" if self.solved else "FAILED",
-					self.message or '')
+			return '{}'.format(self.message)
 
 
 	class House():
@@ -109,6 +107,9 @@ class Puzzle:
 		def __init__(self, props):
 			self.in_use = False
 			self.used = False
+			# If this Fact is definitely inserted correctly (for this Puzzle
+			# perm at least)
+			self.final = False
 			self.props = props
 
 		def __str__(self):
@@ -191,20 +192,20 @@ class Puzzle:
 			if house.props[key] == val:
 				return
 			else:
-				raise self.PuzzleFinish(False, "Can't add {} of {} to house "
-						"{}, already has value of {}".format(key, val,
-									house.props['pos'], house.props[key]))
+				raise self.PuzzleFinish(False, "Can't add {} of {} to {}, "
+						"already has value of {}".format(key, val, house,
+								house.props[key]))
 		else:
 			if not val in house.props[key]:
-				raise self.PuzzleFinish(False, "Can't add {} of {} to house "
-						"{}, value removed from possible list.".format(key, val,
-								house.props['pos']))
+				raise self.PuzzleFinish(False, "Can't add {} of {} to {}, "
+						"value removed from possible list.".format(key, val,
+								house))
 
 		prev_assigned = self.find_house(key, val)
 		if prev_assigned:
-			raise self.PuzzleFinish(False, "Can't add {} of {} to house "
-					"{}, value already at house {}".format(key, val,
-								house.props['pos'], prev_assigned.props['pos']))
+			raise self.PuzzleFinish(False, "Can't add {} of {} to {}, "
+					"value already at house {}".format(key, val, house,
+							prev_assigned.props['pos']))
 
 		house.set_prop_value(key, val)
 
@@ -214,6 +215,7 @@ class Puzzle:
 			if house is not None:
 				fact.adjust_rel_values(house.props['pos'] - rel)
 				self.insert_fact(fact)
+				fact.final = True
 				return
 
 	# Adds each property in a Fact to the House at the corresponding position
@@ -235,6 +237,14 @@ class Puzzle:
 		fact.used = True
 
 	def __str__(self):
+		ret = 'Puzzle {}'.format(self.perm)
+		ret += '{:>{pad}}'.format( "SOLVED" if self.solved else
+				"FAILED" if self.finished else "UNFINISHED",
+				pad=80 - len(ret))
+		if self.message:
+			ret += '\n{}'.format(self.message)
+
+		# Multiline sections to be placed side-by-side
 		sections = (
 			self.houses_str_gen(),
 			self.facts_str_gen())
@@ -244,14 +254,15 @@ class Puzzle:
 		for n, gen in enumerate(sections):
 			seg_lens[n] = next(gen)
 
-		ret = 'Puzzle {}\n'.format(self.perm)
 		for combined_line in itertools.zip_longest(*sections):
+			line_text = ''
 			for line_seg, seg_len in zip(combined_line, seg_lens):
 				# When a generator finishes before the others, zip returns None
 				line_seg = line_seg or ''
-				ret += '{:{len}}'.format(line_seg, len=seg_len)
-			ret += '\n'
-		return ret
+				line_text += '{:{len}}'.format(line_seg, len=seg_len)
+			ret += '\n{}'.format(line_text.rstrip())
+		return "{}\n{deco}".format(ret, deco='-' * 80)
+
 
 	# Yields length of section before any lines
 	def houses_str_gen(self, colour_key=None, colour_val=None):
@@ -280,7 +291,7 @@ class Puzzle:
 		for n, f in enumerate(self.facts):
 			line = '{:2}. {}'.format(n+1, f)
 			max_len = max(max_len, len(line))
-			line_colour = 'red' if f.in_use else 'white'
+			line_colour = 'green' if f.final else 'red' if f.in_use else 'white'
 			line_attrs = ['dark'] if f.used else []
 			lines += [termcolor.colored(line, line_colour, attrs=line_attrs)]
 		yield max_len
@@ -312,6 +323,9 @@ class Puzzle:
 		try:
 			self.insert_fact(fact)
 		except self.PuzzleFinish as f:
+			self.solved = f.solved
+			self.message = f.message
+			print(self)
 			return False
 
 		return self.guess_facts()
@@ -334,6 +348,9 @@ class Puzzle:
 
 
 	def __init__(self, perm):
+		self.finished = False
+		self.solved = False
+		self.message = None
 		self.perm = perm
 		self.houses = []
 		self.facts = []
@@ -353,7 +370,10 @@ class Puzzle:
 			# successful, recursively attempt this with each following Fact.
 			self.guess_facts()
 		except self.PuzzleFinish as f:
-			print("{deco}\n{}\n{}\n{deco}".format(self, f, deco='=' * 80))
+			self.finished = True
+			self.solved = f.solved
+			self.message = f.message
+			print(self)
 
 verbose = False
 
@@ -366,6 +386,7 @@ def main():
 	global verbose
 	verbose = args.verbose
 	for perm in itertools.product(*tuple([[-1, 1]] * 4)):
+		print("{}\nCLUE PERM {}:".format('#' * 80, perm))
 		Puzzle(perm)
 
 if __name__ == '__main__':
