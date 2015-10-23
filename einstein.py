@@ -97,11 +97,11 @@ class Puzzle:
 			if val in self.props.get(key):
 				self.props[key].remove(val)
 
-			if len(self.props[key]) is 1:
-				if verbose:
-					print("{}: Only one possible value of \'{}\'...".format(
-							self, key))
-				self.set_prop_value(key, val)
+				if len(self.props[key]) is 1:
+					if verbose:
+						print("{}: Only one possible value of \'{}\'...".format(
+								self, key))
+					self.set_prop_value(key, val)
 
 	# A dictionary of properties (tuples) with a relative position from one
 	# another
@@ -312,7 +312,6 @@ class Puzzle:
 		try:
 			self.insert_fact(fact)
 		except self.PuzzleFinish as f:
-			print(f)
 			return False
 
 		return self.guess_facts()
@@ -353,11 +352,8 @@ class Puzzle:
 			# possible offset of some arbitrary prop. While the insert is
 			# successful, recursively attempt this with each following Fact.
 			self.guess_facts()
-			print(self)
 		except self.PuzzleFinish as f:
 			print("{deco}\n{}\n{}\n{deco}".format(self, f, deco='=' * 80))
-
-		print(self)
 
 verbose = False
 
