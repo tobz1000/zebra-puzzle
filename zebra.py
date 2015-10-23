@@ -404,8 +404,48 @@ def main():
 	global verbose
 	verbose = args.verbose
 
+	raw_facts = facts_from_file(args.facts_file)
+
 	for perm in itertools.product(*tuple([[-1, 1]] * 4)):
 		Puzzle(args.facts_file, perm)
+
+
+def facts_permutation(facts):
+	facts_perm = copy.deepcopy(facts)
+	for prop, rel in facts_perm.items():
+		if rel == '?'
+
+def facts_from_file(facts_file):
+	perm_i = iter(self.perm)
+	f = open(facts_file, 'r')
+
+	for line in f:
+		if line[0] is '#' or line[0] is '\n':
+			continue
+		props = line.split(',')
+
+		# Keys: a property tuple (key, val); values: relative position of
+		# the property.
+		prop_dict = {}
+
+		for prop in props:
+			kvlist = prop.split()
+			if len(kvlist) < 2:
+				continue
+
+			key, val = kvlist[:2]
+
+			if key == 'pos':
+				val = int(val)
+
+			if len(kvlist) > 2:
+				if rel = kvlist[2]
+			else:
+				rel = 0
+
+			prop_dict.update({(key, val): rel})
+
+		facts += [ self.Fact(prop_dict) ]
 
 if __name__ == '__main__':
 	main()
