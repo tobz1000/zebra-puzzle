@@ -1,49 +1,49 @@
 # There are five houses.
 
 # The Englishman lives in the red house.
-nat eng col red
+nat eng,col red
 
 # The Spaniard owns the dog.
-nat spa pet dog
+nat spa,pet dog
 
 # Coffee is drunk in the green house.
-dri cof col gre
+dri cof,col gre
 
 # The Ukrainian drinks tea.
-nat ukr dri tea
+nat ukr,dri tea
 
 # The green house is immediately to the right of the ivory house.
-col gre col ivo -1
+col gre 1,col ivo
 
 # The Old Gold smoker owns snails.
-smo old pet sna
+smo old,pet sna
 
 # Kools are smoked in the yellow house.
-smo koo col yel
+smo koo,col yel
 
 # Milk is drunk in the middle house.
-dri mil pos 2
+dri mil,pos 2
 
 # The Norwegian lives in the first house.
-nat nor pos 0
+nat nor,pos 0
 
 # The man who smokes Chesterfields lives in the house next to the man with the fox.
-smo che pet fox ?
+smo che,pet fox ?
 
 # Kools are smoked in the house next to the house where the horse is kept.
-smo koo pet hor ?
+smo koo,pet hor ?
 
 # The Lucky Strike smoker drinks orange juice.
-smo luc dri ora
+smo luc,dri ora
 
 # The Japanese smokes Parliaments.
-nat jap smo par
+nat jap,smo par
 
 # The Norwegian lives next to the blue house.
-nat nor col blu ?
+nat nor,col blu ?
 
 # Now, who drinks water?
-#dri wat
+dri wat
 
 # Who owns the zebra?
-#pet zeb
+pet zeb

@@ -1,47 +1,47 @@
 # 1. The Brit lives in the red house.
-nat bri col red
+nat bri,col red
 
 # 2. The Swede keeps dogs as pets.
-nat swe pet dog
+nat swe,pet dog
 
 # 3. The Dane drinks tea.
-nat dan dri tea
+nat dan,dri tea
 
 # 4. The green house is on the immediate left of the white house.
-col gre col whi 1
+col gre,col whi 1
 
 # 5. The green houses owner drinks coffee.
-col gre dri cof
+col gre,dri cof
 
 # 6. The owner who smokes Pall Mall rears birds.
-smo pal pet bir
+smo pal,pet bir
 
 # 7. The owner of the yellow house smokes Dunhill.
-col yel smo dun
+col yel,smo dun
 
 # 8. The owner living in the center house drinks milk.
-pos 2 dri mil
+pos 2,dri mil
 
 # 9. The Norwegian lives in the first house.
-nat nor pos 0
+nat nor,pos 0
 
 # 10. The owner who smokes Blends lives next to the one who keeps cats.
-smo ble pet cat ?
+smo ble,pet cat ?
 
 # 11. The owner who keeps the horse lives next to the one who smokes Dunhill.
-pet hor smo dun ?
+pet hor,smo dun ?
 
 # 12. The owner who smokes Bluemasters drinks beer.
-smo blu dri bee
+smo blu,dri bee
 
 # 13. The German smokes Prince.
-nat ger smo pri
+nat ger,smo pri
 
 # 14. The Norwegian lives next to the blue house.
-nat nor col blu ?
+nat nor,col blu ?
 
 # 15. The owner who smokes Blends lives next to the one who drinks water.
-smo ble dri wat ?
+smo ble,dri wat ?
 
 # Who owns the fish?
-#pet fis
+pet fis

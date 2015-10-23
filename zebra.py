@@ -8,10 +8,6 @@ import copy
 Now with classes!
 
 TODO:
-	* Support "question" facts fromt the facts file. Or more generally, allow
-	any Fact definition (any no. of props, any no. of relative positions)
-		* Maybe like this:
-			nat nor,pet fis -1,dri cof
 	* Not solved. Improve string output, so state of puzzle shows the
 	house-grid, and unused facts. Then print this after 1) inserting definites;
 	2) coming to the end of a guess_facts() branch.
@@ -95,12 +91,15 @@ class Puzzle:
 			if not self.prop_found(key) and not val in self.props[key]:
 				self.props[key] += [ val ]
 
+		# TODO: This currently does bad things if the house doesn't have enough
+		# possible values. Exception caught for debug.
 		def remove_possible(self, key, val):
 			if val in self.props.get(key):
 				try:
 					self.props[key].remove(val)
 				except AttributeError:
-					print("slot = {}({}) val-to-remove = {}".format(self.props[key], len(self.props[key]), val))
+					print("slot = {}({}) val-to-remove = {}".format(
+							self.props[key], len(self.props[key]), val))
 					raise
 
 				if len(self.props[key]) is 1:
@@ -144,33 +143,41 @@ class Puzzle:
 		for line in f:
 			if line[0] is '#' or line[0] is '\n':
 				continue
-			toks = line.strip().split()
-			if len(toks) < 4:
+			props = line.split(',')
+			if len(props) < 1:
 				continue
 
-			k1, v1, k2, v2 = toks[:4]
+			# Keys: a property tuple (key, val); values: relative position of
+			# the property.
+			prop_dict = {}
 
-			if k1 == 'pos':
-				v1 = int(v1)
-			if k2 == 'pos':
-				v2 = int(v2)
+			for prop in props:
+				kvlist = prop.split()
+				if len(kvlist) < 2:
+					continue
 
-			# Unknown "relative position" values
-			if len(toks) > 4:
-				if toks[4] == '?':
-					rel2 = next(perm_i, 0)
+				key, val = kvlist[:2]
+
+				if key == 'pos':
+					val == int(val)
+
+				if len(kvlist) > 2:
+					if kvlist[2] == '?':
+						rel = next(perm_i, 0)
+					else:
+						rel = int(kvlist[2])
 				else:
-					rel2 = int(toks[4])
-			else:
-				rel2 = 0
+					rel = 0
 
-			self.facts += [ self.Fact({(k1, v1): 0, (k2, v2): rel2}) ]
+				prop_dict.update({(key, val): rel})
+
+			self.facts += [ self.Fact(prop_dict) ]
 
 	def populate_houses(self):
 		for h in self.houses:
 			# h.add_possible('pet', 'fis')
-			h.add_possible('pet', 'zeb')
-			h.add_possible('dri', 'wat')
+			# h.add_possible('pet', 'zeb')
+			# h.add_possible('dri', 'wat')
 			for fact in self.facts:
 				for key, val in fact.props:
 					h.add_possible(key, val)
@@ -363,7 +370,7 @@ class Puzzle:
 		self.populate_houses()
 
 		try:
-			self.combine_facts()
+			# self.combine_facts()
 			# Attach as many facts to house positions as possible
 			for f in self.facts:
 				self.try_definite_fact(f)
@@ -389,7 +396,7 @@ def main():
 	args = ap.parse_args()
 	global verbose
 	verbose = args.verbose
-	for perm in itertools.product(*tuple([[-1, 1]] * 4)):
+	for perm in itertools.product(*tuple([[-1, 1]] * 3)):
 		print("{}".format('#' * 80, perm))
 		Puzzle(perm)
 
