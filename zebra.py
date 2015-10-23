@@ -8,17 +8,18 @@ import copy
 Now with classes!
 
 TODO:
-	* Not solved. Improve string output, so state of puzzle shows the
-	house-grid, and unused facts. Then print this after 1) inserting definites;
-	2) coming to the end of a guess_facts() branch.
-		* Small counter of current guess-combo, e.g. "2->3->3->4". Write "final"
-				facts in green.
+	* Not solved. Improve string output:
+		* For non-verbose, show small counter of current guess-combo,
+		e.g. "2->3->3->4". Write "final" facts in green.
 		* Try showing conflicts/add since last print on the Houses grid
 	* Improve reading of facts.txt:
 		* Scan for '?'s first, and get number of vars to permutate from this
 		count.
-		* Probably best move the scan outside of Puzzle, and save list of dicts
-		with '?'s first
+		* Probably best move the scan outside of Puzzle, pass a dictionary of
+		facts:relative-position to the Puzzle constructor.
+			* Doing this would then require another way to easily identify
+			which permutation we're on. Maybe just a name passed to the
+			constructor? e.g. "left-left-right"
 	* Make clue-strings available in output
 	* Unify 'props': currently work as a dict in Houses, and as a tuple (which
 	is used as a dict-key) in Facts. Slightly confusing :)
@@ -136,9 +137,9 @@ class Puzzle:
 						return True
 			return False
 
-	def get_initial_facts(self):
+	def get_initial_facts(self, facts_file):
 		perm_i = iter(self.perm)
-		f = open('facts2.txt', 'r')
+		f = open(facts_file, 'r')
 
 		for line in f:
 			if line[0] is '#' or line[0] is '\n':
@@ -175,9 +176,6 @@ class Puzzle:
 
 	def populate_houses(self):
 		for h in self.houses:
-			# h.add_possible('pet', 'fis')
-			# h.add_possible('pet', 'zeb')
-			# h.add_possible('dri', 'wat')
 			for fact in self.facts:
 				for key, val in fact.props:
 					h.add_possible(key, val)
@@ -185,7 +183,7 @@ class Puzzle:
 	# rel = find house to the right (positive) or left (negative)
 	# of the house with key=val.
 	def find_house(self, key, val, rel=None):
-		f = list(filter(lambda house: house.props.get(key) == val, self.houses))
+		f = list(h for h in self.houses if h.props.get(key) == val)
 
 		if len(f) is not 1:
 			return None
@@ -356,21 +354,23 @@ class Puzzle:
 
 		return False
 
-	def __init__(self, perm):
+	def __init__(self, facts_file, perm):
 		self.finished = False
 		self.solved = False
 		self.message = None
 		self.perm = perm
 		self.houses = []
 		self.facts = []
-		self.get_initial_facts()
+		self.get_initial_facts(facts_file)
 		for i in range(self.no_of_houses):
 			self.houses += [ self.House(i, self) ]
 
 		self.populate_houses()
 
+		print("{}".format('#' * 80, perm))
+
 		try:
-			# self.combine_facts()
+			self.combine_facts()
 			# Attach as many facts to house positions as possible
 			for f in self.facts:
 				self.try_definite_fact(f)
@@ -389,16 +389,18 @@ class Puzzle:
 verbose = False
 
 def main():
-	ap = argparse.ArgumentParser(
-			description='"Zebra Puzzle" solver.')
+	ap = argparse.ArgumentParser(description='"Zebra Puzzle" solver.')
+	ap.add_argument('facts_file', help='File location of facts to parse.',
+			nargs='?', default='zebra.txt')
 	ap.add_argument('-v', dest='verbose', action='store_true',
 			help='Print verbose output.')
 	args = ap.parse_args()
+
 	global verbose
 	verbose = args.verbose
-	for perm in itertools.product(*tuple([[-1, 1]] * 3)):
-		print("{}".format('#' * 80, perm))
-		Puzzle(perm)
+
+	for perm in itertools.product(*tuple([[-1, 1]] * 4)):
+		Puzzle(args.facts_file, perm)
 
 if __name__ == '__main__':
 	main()
