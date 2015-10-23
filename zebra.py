@@ -8,9 +8,14 @@ import copy
 Now with classes!
 
 TODO:
+	* (Not necessary for the puzzle but would be cool) support arbitrary
+	possible positions in fact file, instead of just '?' = -1/+1.
+		* e.g.: "nat nor, pet fis -1 -2"  <-- fish could be either one or two to
+		the left of Norway
 	* Not solved. Improve string output:
 		* For non-verbose, show small counter of current guess-combo,
-		e.g. "2->3->3->4". Write "final" facts in green.
+		e.g. "2->3->3->_->_->_->0->1->_->_". Write "final" facts in green.
+			* Number would be value of lowest rel in the Fact.
 		* Try showing conflicts/add since last print on the Houses grid
 	* Improve reading of facts.txt:
 		* Scan for '?'s first, and get number of vars to permutate from this
