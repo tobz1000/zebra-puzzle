@@ -159,7 +159,7 @@ class Puzzle:
 				key, val = kvlist[:2]
 
 				if key == 'pos':
-					val == int(val)
+					val = int(val)
 
 				if len(kvlist) > 2:
 					if kvlist[2] == '?':
