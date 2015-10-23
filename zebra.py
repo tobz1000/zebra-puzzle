@@ -383,7 +383,7 @@ verbose = False
 
 def main():
 	ap = argparse.ArgumentParser(
-			description='Einstein\'s puzzle-solver.')
+			description='"Zebra Puzzle" solver.')
 	ap.add_argument('-v', dest='verbose', action='store_true',
 			help='Print verbose output.')
 	args = ap.parse_args()
