@@ -11,7 +11,9 @@ TODO:
 	* Not solved. Improve string output, so state of puzzle shows the
 	house-grid, and unused facts. Then print this after 1) inserting definites;
 	2) coming to the end of a guess_facts() branch.
-		* Keep track of facts used in guess_facts, so these can be printed too.
+		* Small counter of current guess-combo, e.g. "2->3->3->4". Write "final"
+				facts in green.
+		* Try showing conflicts/add since last print on the Houses grid
 	* Improve reading of facts.txt:
 		* Scan for '?'s first, and get number of vars to permutate from this
 		count.
@@ -74,8 +76,6 @@ class Puzzle:
 			return val is not None and not isinstance(val, list)
 
 		def set_prop_value(self, key, val):
-			if verbose:
-				print("    {}: Setting {} to {}".format(self, key, val))
 			self.puzzle_inst.changed_last_cycle = True
 
 			for house in self.puzzle_inst.houses:
@@ -96,9 +96,6 @@ class Puzzle:
 				self.props[key].remove(val)
 
 				if len(self.props[key]) is 1:
-					if verbose:
-						print("{}: Only one possible value of \'{}\'...".format(
-								self, key))
 					self.set_prop_value(key, val)
 
 	# A dictionary of properties (tuples) with a relative position from one
@@ -225,8 +222,6 @@ class Puzzle:
 			raise self.PuzzleFinish(False, "Tried to reuse Fact {}".format(
 					fact))
 		fact.in_use = True
-		if verbose:
-			print("Adding props from Fact {}...".format(fact))
 		for prop, rel in fact.props.items():
 			house = self.find_house('pos', rel)
 			if house is None:
@@ -265,7 +260,7 @@ class Puzzle:
 
 
 	# Yields length of section before any lines
-	def houses_str_gen(self, colour_key=None, colour_val=None):
+	def houses_str_gen(self):
 		key_len = 4
 		val_len = 6
 		max_len = key_len + val_len * len(self.houses)
@@ -277,8 +272,6 @@ class Puzzle:
 				val = house.props[key]
 				if house.prop_found(key):
 					val_fmt = '{:^6}'.format(val)
-					if ((key, val) == (colour_key, colour_val)):
-						val_fmt = termcolor.colored(val_fmt, 'green')
 					ret += val_fmt
 				else:
 					ret += '{:6}'.format('|' * len(val))
@@ -325,7 +318,8 @@ class Puzzle:
 		except self.PuzzleFinish as f:
 			self.solved = f.solved
 			self.message = f.message
-			print(self)
+			if verbose:
+				print(self)
 			return False
 
 		return self.guess_facts()
@@ -343,9 +337,7 @@ class Puzzle:
 			if p_cpy.try_insert_next_fact():
 				return True
 
-		raise self.PuzzleFinish(False, "Couldn't find a working combination "
-			"for remaining Facts")
-
+		return False
 
 	def __init__(self, perm):
 		self.finished = False
@@ -368,7 +360,9 @@ class Puzzle:
 			# Remaining facts: fork the Puzzle, try to insert first Fact at each
 			# possible offset of some arbitrary prop. While the insert is
 			# successful, recursively attempt this with each following Fact.
-			self.guess_facts()
+			if not self.guess_facts():
+				raise self.PuzzleFinish(False, "Couldn't find a working "
+						"combination for remaining Facts")
 		except self.PuzzleFinish as f:
 			self.finished = True
 			self.solved = f.solved
@@ -386,7 +380,7 @@ def main():
 	global verbose
 	verbose = args.verbose
 	for perm in itertools.product(*tuple([[-1, 1]] * 4)):
-		print("{}\nCLUE PERM {}:".format('#' * 80, perm))
+		print("{}".format('#' * 80, perm))
 		Puzzle(perm)
 
 if __name__ == '__main__':
