@@ -147,7 +147,7 @@ class Puzzle:
 		f = open(facts_file, 'r')
 
 		for line in f:
-			if line[0] is '#' or line[0] is '\n':
+			if line[0] in '#\n':
 				continue
 			props = line.split(',')
 			if len(props) < 1:
@@ -404,7 +404,7 @@ def main():
 	global verbose
 	verbose = args.verbose
 
-	for perm in itertools.product(*tuple([[-1, 1]] * 4)):
+	for perm in itertools.product(*([-1, 1],) * 4):
 		Puzzle(args.facts_file, perm)
 
 if __name__ == '__main__':
