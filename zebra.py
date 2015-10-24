@@ -5,15 +5,12 @@ import argparse
 import copy
 
 """
-"Zebra Puzzle"-solver. Almost works I think.
+"Zebra Puzzle"-solver.
 
 TODO:
-
 	*Improve string output:
-		* For non-verbose, show small counter of current guess-combo,
-		e.g. "2->3->3->_->_->_->0->1->_->_". Write "final" facts in green.
-			* Number would be value of lowest rel in the Fact.
-		* Try showing conflicts/add since last print on the Houses grid
+		* For verbose: Try showing conflicts/added-since-last-print on the
+		Houses grid
 	* Improve reading of facts.txt:
 		* Scan for '?'s first, and get number of vars to permutate from this
 		count.
@@ -153,7 +150,8 @@ class Puzzle:
 
 		self.populate_houses()
 
-		print("{}".format('#' * 80, perm))
+		if verbose:
+			print("{}".format('#' * 80, perm))
 
 		try:
 			self.combine_facts()
@@ -170,81 +168,105 @@ class Puzzle:
 			self.finished = True
 			self.solved = f.solved
 			self.message = f.message
-			print(self)
+			# print(self.summary_str(verbose=True))
+			print(self.summary_str(verbose=verbose))
 
 
-	def __str__(self):
-		"""Returns the Puzzle status & any error message, and the Houses grid &
-		list of clues side-by-side."""
-		ret = 'Puzzle {}'.format(self.perm)
-		ret += '{:>{pad}}'.format( "SOLVED" if self.solved else
-				"FAILED" if self.finished else "UNFINISHED",
-				pad=80 - len(ret))
-		if self.message:
-			ret += '\n{}'.format(self.message)
+	def summary_str(self, verbose=False):
+		"""Verbose: Returns the Puzzle status & any error message, and the
+		Houses grid & list of clues side-by-side.
+		Non-verbose: short version of facts positions only"""
 
-		# Multiline sections to be placed side-by-side
-		sections = (
-			self.houses_str_gen(),
-			self.facts_str_gen())
+		def houses_str_gen():
+			"""Shows the value of each House property in a grid, or the number of
+			remaining possible values for a property in a bar graph.
+			Yields the line length for the grid, then yields the lines one by
+			one."""
+			key_len = 4
+			val_len = 6
+			max_len = key_len + val_len * len(self.houses)
+			yield max_len
+			yield "{:{len}}".format("Houses:", len=max_len)
+			for key in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
+				ret = '{:4}'.format(key)
+				for house in self.houses:
+					val = house.props[key]
+					if house.prop_found(key):
+						val_fmt = '{:^6}'.format(val)
+						ret += val_fmt
+					else:
+						ret += '{:6}'.format('|' * len(val))
+				yield ret
 
-		# Padding sizes should be first yield
-		seg_lens = [None] * len(sections)
-		for n, gen in enumerate(sections):
-			seg_lens[n] = next(gen)
+		def facts_str_gen():
+			"""Shows a list of facts: the current relative position tied to each,
+			and colours to denote status:
+			White: unused
+			Grey: Currently inserted
+			Green: Finally inserted (definitely correct for this permutation)
+			Red: Currently in use (e.g. half-way through inserting when an error
+			occurred).
+			Shows all props for each fact with its relative position.
+			Yields the line length for the block of text, then yields the lines one
+			by one."""
 
-		for combined_line in itertools.zip_longest(*sections):
-			line_text = ''
-			for line_seg, seg_len in zip(combined_line, seg_lens):
-				# When a generator finishes before the others, zip returns None
-				line_seg = line_seg or ''
-				line_text += '{:{len}}'.format(line_seg, len=seg_len)
-			ret += '\n{}'.format(line_text.rstrip())
-		return "{}\n{deco}".format(ret, deco='-' * 80)
+			max_len = 0
+			lines = []
+			for n, f in enumerate(self.facts):
+				line = '{:2}. {}'.format(n+1, f)
+				max_len = max(max_len, len(line))
+				lines += [colour_fact(f, line)]
+			yield max_len
+			yield "{:{len}}".format('Facts:', len=max_len)
+			for line in lines:
+				yield line
 
-	def houses_str_gen(self):
-		"""Shows the value of each House property in a grid, or the number of
-		remaining possible values for a property in a bar graph.
-		Yields the line length for the grid, then yields the lines one by
-		one."""
-		key_len = 4
-		val_len = 6
-		max_len = key_len + val_len * len(self.houses)
-		yield max_len
-		yield "{:{len}}".format("Houses:", len=max_len)
-		for key in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
-			ret = '{:4}'.format(key)
-			for house in self.houses:
-				val = house.props[key]
-				if house.prop_found(key):
-					val_fmt = '{:^6}'.format(val)
-					ret += val_fmt
-				else:
-					ret += '{:6}'.format('|' * len(val))
-			yield ret
+		def facts_str_short():
+			"""Returns the absolute position of inserted Facts, in order - or
+			'_' for uninserted - on one line."""
+			line = ''
+			first_entry = True
+			for f in self.facts:
+				seg = '{}{}'.format('-' if not first_entry else '',
+					f.props[next(iter(f.props))] if f.used or f.in_use else
+							'_')
+				first_entry = False
+				line += colour_fact(f, seg)
+			return line
 
-	def facts_str_gen(self):
-		"""Shows a list of facts: each of their properties, the current relative
-		position tied to each, and colours to denote status:
-		White: unused
-		Grey: Currently inserted
-		Green: Finally inserted (definitely correct for this permutation)
-		Red: Currently in use (e.g. half-way through inserting when an error
-		occurred).
-		Yields the line length for the grid, then yields the lines one by
-		one."""
-		max_len = 0
-		lines = []
-		for n, f in enumerate(self.facts):
-			line = '{:2}. {}'.format(n+1, f)
-			max_len = max(max_len, len(line))
-			line_colour = 'green' if f.final else 'red' if f.in_use else 'white'
-			line_attrs = ['dark'] if f.used else []
-			lines += [termcolor.colored(line, line_colour, attrs=line_attrs)]
-		yield max_len
-		yield "{:{len}}".format('Facts:', len=max_len)
-		for line in lines:
-			yield line
+		# Should be used after getting line length
+		def colour_fact(fact, text):
+			line_colour = ('green' if fact.final else 'red' if fact.in_use else
+					'white')
+			line_attrs = ['dark'] if fact.used else []
+			return termcolor.colored(text, line_colour, attrs=line_attrs)
+
+		ret = 'Puzzle {:16}'.format(str(self.perm))
+		if verbose:
+			ret += '{:>{pad}}'.format( "SOLVED" if self.solved else
+					"FAILED" if self.finished else "UNFINISHED",
+					pad=80 - len(ret))
+			if self.message:
+				ret += '\n{}'.format(self.message)
+
+			# Multiline sections to be placed side-by-side
+			sections = (houses_str_gen(), facts_str_gen())
+
+			# Padding sizes should be first yield
+			seg_lens = [None] * len(sections)
+			for n, gen in enumerate(sections):
+				seg_lens[n] = next(gen)
+
+			for combined_line in itertools.zip_longest(*sections):
+				line_text = ''
+				for line_seg, seg_len in zip(combined_line, seg_lens):
+					# When a generator finishes before the others, zip returns None
+					line_seg = line_seg or ''
+					line_text += '{:{len}}'.format(line_seg, len=seg_len)
+				ret += '\n{}'.format(line_text.rstrip())
+			return "{}\n{deco}".format(ret, deco='-' * 80)
+		else: # Move back to start of last line
+			return '{} {}{}'.format(ret, facts_str_short(), "\033[F\r")
 
 	def get_initial_facts(self, facts_file):
 		"""Read in initial facts from a file. Properties are separate by commas,
@@ -396,8 +418,7 @@ class Puzzle:
 		except self.PuzzleFinish as f:
 			self.solved = f.solved
 			self.message = f.message
-			if verbose:
-				print(self)
+			print(self.summary_str(verbose=verbose))
 			return False
 
 		return self.guess_facts()
