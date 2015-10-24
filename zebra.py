@@ -8,9 +8,6 @@ import copy
 "Zebra Puzzle"-solver.
 
 TODO:
-	*Improve string output:
-		* For verbose: Try showing conflicts/added-since-last-print on the
-		Houses grid
 	* Improve reading of facts.txt:
 		* Scan for '?'s first, and get number of vars to permutate from this
 		count.
@@ -39,60 +36,27 @@ class Puzzle:
 	class PuzzleFinish(Exception):
 		"""Exception thrown when a puzzle cannot continue. Either it's solved
 		or an invalid action has occurred."""
-		def __init__(self, solved, message=None):
+		def __init__(self, solved, message=None, highlight=None):
 			self.solved = solved
 			self.message = message
+			self.highlight = highlight
 
+	def handle_finish(self, finish):
+		"""Pass back attribute from the exception, and prints out the final
+		Puzzle status. Always print verbose version for a solved Puzzle."""
+		self.solved = finish.solved
+		self.message = finish.message
+		self.house_highlight = finish.highlight or {}
+		print(self.summary_str(verbose=verbose or self.solved))
 
 	class House():
 		"""A house with each of the proprties, to be given values."""
-		def __init__(self, pos, puzzle_inst):
-			self.puzzle_inst = puzzle_inst
+		def __init__(self, pos):
 			self.props = {}
 			self.props['pos'] = pos
 
 		def __str__(self):
 			return "House {}".format(self.props['pos'])
-
-		def prop_found(self, key):
-			"""Return whether a particular property has been determined for this
-			house."""
-			val = self.props.get(key)
-			return val is not None and not isinstance(val, list)
-
-		def set_prop_value(self, key, val):
-			"""Set a property with a given value, and remove this value from the
-			possible values for other houses."""
-			for house in self.puzzle_inst.houses:
-				if house is not self:
-					house.remove_possible(key, val)
-
-			self.props[key] = val
-
-		def add_possible(self, key, val):
-			"""Populate the list of possible values of a property with the given
-			key."""
-			if not key in self.props:
-				self.props[key] = []
-
-			if not self.prop_found(key) and not val in self.props[key]:
-				self.props[key] += [ val ]
-
-		# TODO: This currently does bad things if the house doesn't have enough
-		# possible values. Exception caught for debug.
-		def remove_possible(self, key, val):
-			"""Rule out a possible value of a property. Will set a property's
-			value if only one possibility remains."""
-			if val in self.props.get(key):
-				try:
-					self.props[key].remove(val)
-				except AttributeError:
-					print("slot = {}({}) val-to-remove = {}".format(
-							self.props[key], len(self.props[key]), val))
-					raise
-
-				if len(self.props[key]) is 1:
-					self.set_prop_value(key, val)
 
 	# A dictionary of properties (tuples) with a relative position from one
 	# another
@@ -105,8 +69,8 @@ class Puzzle:
 		def __init__(self, props):
 			self.in_use = False
 			self.used = False
-			# If this Fact is definitely inserted correctly (for this Puzzle
-			# perm at least)
+			# Whether this Fact is definitely inserted correctly (for this
+			# Puzzle perm at least)
 			self.final = False
 			self.props = props
 
@@ -141,14 +105,13 @@ class Puzzle:
 		self.finished = False
 		self.solved = False
 		self.message = None
+		self.house_highlight = {}
 		self.perm = perm
 		self.houses = []
 		self.facts = []
 		self.get_initial_facts(facts_file)
 		for i in range(self.no_of_houses):
-			self.houses += [ self.House(i, self) ]
-
-		self.populate_houses()
+			self.houses += [ self.House(i) ]
 
 		if verbose:
 			print("{}".format('#' * 80, perm))
@@ -161,15 +124,18 @@ class Puzzle:
 			# Remaining facts: fork the Puzzle, try to insert first Fact at each
 			# possible offset of some arbitrary prop. While the insert is
 			# successful, recursively attempt this with each following Fact.
-			if not self.guess_facts():
+			solved_puzzle = self.guess_facts()
+			if solved_puzzle is None:
 				raise self.PuzzleFinish(False, "Couldn't find a working "
 						"combination for remaining Facts")
+
+			# Just completely replace this object with the one that succeeded
+			self.__dict__ = solved_puzzle.__dict__
+			raise self.PuzzleFinish(True, "Done!")
+
 		except self.PuzzleFinish as f:
 			self.finished = True
-			self.solved = f.solved
-			self.message = f.message
-			# print(self.summary_str(verbose=True))
-			print(self.summary_str(verbose=verbose))
+			self.handle_finish(f)
 
 
 	def summary_str(self, verbose=False):
@@ -183,29 +149,23 @@ class Puzzle:
 			Yields the line length for the grid, then yields the lines one by
 			one."""
 			key_len = 4
-			val_len = 6
+			val_len = 5
 			max_len = key_len + val_len * len(self.houses)
 			yield max_len
 			yield "{:{len}}".format("Houses:", len=max_len)
 			for key in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
 				ret = '{:4}'.format(key)
 				for house in self.houses:
-					val = house.props[key]
-					if house.prop_found(key):
-						val_fmt = '{:^6}'.format(val)
-						ret += val_fmt
-					else:
-						ret += '{:6}'.format('|' * len(val))
+					highlight = self.house_highlight.get((house, key))
+					val = house.props.get(key)
+					val = '{:^3}'.format(val) if val is not None else '---'
+					val = termcolor.colored(val, None, on_color=highlight)
+					ret += ' {} '.format(val)
 				yield ret
 
 		def facts_str_gen():
 			"""Shows a list of facts: the current relative position tied to each,
-			and colours to denote status:
-			White: unused
-			Grey: Currently inserted
-			Green: Finally inserted (definitely correct for this permutation)
-			Red: Currently in use (e.g. half-way through inserting when an error
-			occurred).
+			and colours to denote status.
 			Shows all props for each fact with its relative position.
 			Yields the line length for the block of text, then yields the lines one
 			by one."""
@@ -236,8 +196,13 @@ class Puzzle:
 
 		# Should be used after getting line length
 		def colour_fact(fact, text):
+			"""White: unused
+			Grey: Currently inserted
+			Green: Finally inserted (definitely correct for this permutation)
+			Red: Currently in use (e.g. half-way through inserting when an error
+			occurred)."""
 			line_colour = ('green' if fact.final else 'red' if fact.in_use else
-					'white')
+					None)
 			line_attrs = ['dark'] if fact.used else []
 			return termcolor.colored(text, line_colour, attrs=line_attrs)
 
@@ -326,13 +291,6 @@ class Puzzle:
 				break
 		self.combine_facts(facts)
 
-	def populate_houses(self):
-		"""Fill the "possible values" lists for each property in each House."""
-		for h in self.houses:
-			for fact in self.facts:
-				for key, val in fact.props:
-					h.add_possible(key, val)
-
 	# rel = find house to the right (positive) or left (negative)
 	# of the house with key=val.
 	def find_house(self, key, val, rel=None):
@@ -357,27 +315,25 @@ class Puzzle:
 	def single_prop_add(self, house, key, val):
 		"""Set the value of a property on a given House, raising a PuzzleFinish
 		if it's invalid."""
-		if house.prop_found(key):
+		curr_val = house.props.get(key)
+		if curr_val is not None:
 			# Already has value; only error out if value is different
-			if house.props[key] == val:
+			if curr_val == val:
 				return
 			else:
 				raise self.PuzzleFinish(False, "Can't add {} of {} to {}, "
 						"already has value of {}".format(key, val, house,
-								house.props[key]))
-		else:
-			if not val in house.props[key]:
-				raise self.PuzzleFinish(False, "Can't add {} of {} to {}, "
-						"value removed from possible list.".format(key, val,
-								house))
+								curr_val), highlight={(house, key): 'on_red'})
 
 		prev_assigned = self.find_house(key, val)
 		if prev_assigned:
 			raise self.PuzzleFinish(False, "Can't add {} of {} to {}, "
-					"value already at house {}".format(key, val, house,
-							prev_assigned.props['pos']))
+					"value already at {}".format(key, val, house,
+							prev_assigned),
+					highlight={(house, key): 'on_red',
+							(prev_assigned, key): 'on_yellow'})
 
-		house.set_prop_value(key, val)
+		house.props[key] = val
 
 	def try_definite_fact(self, fact):
 		"""Insert fact if it's definitely true (for this Puzzle's permutation at
@@ -416,10 +372,8 @@ class Puzzle:
 		try:
 			self.insert_fact(fact)
 		except self.PuzzleFinish as f:
-			self.solved = f.solved
-			self.message = f.message
-			print(self.summary_str(verbose=verbose))
-			return False
+			self.handle_finish(f)
+			return None
 
 		return self.guess_facts()
 
@@ -431,17 +385,17 @@ class Puzzle:
 		with a new copy."""
 		fact = self.next_unused_fact()
 		if fact is None:
-			return True
+			return self
 
 		# Take an arbitrary prop and try all possible positions
 		pivot_prop = next(iter(fact.props))
 		for i in range(0, self.no_of_houses):
 			fact.adjust_rel_values(i - fact.props[pivot_prop])
 			p_cpy = copy.deepcopy(self)
-			if p_cpy.try_insert_next_fact():
-				return True
-
-		return False
+			final_p_cpy = p_cpy.try_insert_next_fact()
+			if final_p_cpy is not None:
+				return final_p_cpy
+		return None
 
 verbose = False
 
@@ -456,8 +410,16 @@ def main():
 	global verbose
 	verbose = args.verbose
 
+	last_puzzle = None
+
 	for perm in itertools.product(*([-1, 1],) * 4):
-		Puzzle(args.facts_file, perm)
+		if last_puzzle is None or not last_puzzle.solved:
+			last_puzzle = Puzzle(args.facts_file, perm)
+
+	# Hacky: overwrite last Puzzle status in non-verbose mode with failure
+	# message
+	if not verbose and not last_puzzle.solved:
+		print("{:80}".format("Unable to find a solution :("))
 
 if __name__ == '__main__':
 	main()
