@@ -9,8 +9,6 @@ import copy
 
 TODO:
 	* Improve reading of facts.txt:
-		* Scan for '?'s first, and get number of vars to permutate from this
-		count.
 		* Probably best move the scan outside of Puzzle, pass a dictionary of
 		facts:relative-position to the Puzzle constructor.
 			* Doing this would then require another way to easily identify
