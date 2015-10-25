@@ -412,11 +412,20 @@ def main():
 
 	last_puzzle = None
 
-	for perm in itertools.product(*([-1, 1],) * 4):
+	# Hacky: read through file once just to find number of unknowns.
+	unknown_count = 0
+	f = open(args.facts_file, 'r')
+	for line in f:
+		if line[0] in '#\n':
+			continue
+		unknown_count += line.count('?')
+
+
+	for perm in itertools.product(*([-1, 1],) * unknown_count):
 		if last_puzzle is None or not last_puzzle.solved:
 			last_puzzle = Puzzle(args.facts_file, perm)
 
-	# Hacky: overwrite last Puzzle status in non-verbose mode with failure
+	# More hacky: overwrite last Puzzle status in non-verbose mode with failure
 	# message
 	if not verbose and not last_puzzle.solved:
 		print("{:80}".format("Unable to find a solution :("))
