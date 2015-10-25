@@ -115,7 +115,8 @@ class Puzzle:
 			print("{}".format('#' * 80, perm))
 
 		try:
-			self.combine_facts()
+			if not no_combine:
+				self.combine_facts()
 			# Attach as many facts to house positions as possible
 			for f in self.facts:
 				self.try_definite_fact(f)
@@ -403,10 +404,13 @@ def main():
 			nargs='?', default='zebra.txt')
 	ap.add_argument('-v', dest='verbose', action='store_true',
 			help='Print verbose output.')
+	ap.add_argument('-C', dest='no_combine', action='store_true',
+			help='Don\'t combine clues.')
 	args = ap.parse_args()
 
-	global verbose
+	global verbose, no_combine
 	verbose = args.verbose
+	no_combine = args.no_combine
 
 	last_puzzle = None
 
