@@ -152,7 +152,8 @@ class Puzzle:
 			max_len = key_len + val_len * len(self.houses)
 			yield max_len
 			yield "{:{len}}".format("Houses:", len=max_len)
-			for key in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
+			# for key in ('pos', 'col', 'nat', 'dri', 'smo', 'pet'):
+			for key in (self.all_prop_keys):
 				ret = '{:4}'.format(key)
 				for house in self.houses:
 					highlight = self.house_highlight.get((house, key))
@@ -239,6 +240,7 @@ class Puzzle:
 		value."""
 		perm_i = iter(self.perm)
 		f = open(facts_file, 'r')
+		self.all_prop_keys = set()
 
 		for line in f:
 			if line[0] in '#\n':
@@ -260,6 +262,8 @@ class Puzzle:
 
 				if key == 'pos':
 					val = int(val)
+
+				self.all_prop_keys |= set((key,))
 
 				if len(kvlist) > 2:
 					if kvlist[2] == '?':

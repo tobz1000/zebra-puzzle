@@ -1,0 +1,68 @@
+# Daniella Black and her husband work as Shop-Assistants.
+wom dan, sur bla, job sha
+
+# The book "The Seadog" was brought by a couple who drive a Fiat and love the color red.
+bbr sea, car fia, col red
+
+# Owen and his wife Victoria like the color brown.
+man owe, wom vic, col bro
+
+# Stan Horricks and his wife Hannah like the color white.
+man sta, sur hor, wom han, col whi
+
+# Jenny Smith and her husband work as Warehouse Managers and they drive a Wartburg.
+wom jen, sur smi, job war, car war
+
+# Monica and her husband Alexander borrowed the book "Grandfather Joseph".
+wom mon, man ale, bbo gra
+
+# Mathew and his wife like the color pink and brought the book "Mulatka Gabriela".
+man mat, col pink, bbr mul
+
+# Irene and her husband Oto work as Accountants.
+wom ire, man oto, job acc
+
+# The book "We Were Five" was borrowed by a couple driving a Trabant.
+bbr wew, car tra
+
+# The Cermaks are both Ticket-Collectors who brought the book "Shed Stoat".
+sur cer, job tic, bbo she
+
+# Mr and Mrs Kuril are both Doctors who borrowed the book "Slovacko Judge".
+sur kur, job doc, bbo slo
+
+# Paul and his wife like the color green.
+man pau, col gre
+
+# Veronica Dvorak and her husband like the color blue.
+wom ver, sur dvo, col blu
+
+# Rick and his wife brought the book "Slovacko Judge" and they drive a Ziguli.
+man ric, bbr slo, dri zig
+
+# One couple brought the book "Dame Commissar" and borrowed the book "Mulatka Gabriela".
+bbr dam, bbo mul
+
+# The couple who drive a Dacia, love the color violet.
+car dac, col vio
+
+# The couple who work as Teachers borrowed the book "Dame Commissar".
+job tea, bbo dam
+
+# The couple who work as Agriculturalists drive a Moskvic.
+job agr, car mos
+
+# Pamela and her husband drive a Renault and brought the book "Grandfather Joseph".
+wom pam, car ren, bbr gra
+
+# Pamela and her husband borrowed the book that Mr and Mrs Zajac brought.
+#wom pam, bbo...
+
+# Robert and his wife like the color yellow and borrowed the book "The Modern Comedy".
+man rob, col yel, bbo mod
+
+# Mr and Mrs Swain work as Shoppers.
+sur swa, job sho
+
+# "The Modern Comedy" was brought by a couple driving a Skoda.
+bbr mod, car sko
